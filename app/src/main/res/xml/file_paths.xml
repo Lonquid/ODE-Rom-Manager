@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- App cache dir for temp BMP conversion files -->
+    <cache-path name="cache" path="."/>
+    <!-- External storage for backup files -->
+    <external-path name="ode_backups" path="ODE Rom Manager/backups/"/>
+</paths>

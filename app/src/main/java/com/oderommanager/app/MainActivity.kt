@@ -8,22 +8,24 @@ import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import com.google.android.material.badge.BadgeDrawable
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.oderommanager.app.data.repository.SettingsRepository
 import com.oderommanager.app.databinding.ActivityMainBinding
+import com.oderommanager.app.ui.backuplog.BackupLogFragment
+import com.oderommanager.app.ui.hackworkflow.HackListFragment
+import com.oderommanager.app.ui.home.HomeFragment
+import com.oderommanager.app.ui.library.LibraryFragment
+import com.oderommanager.app.ui.settings.SettingsFragment
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var settingsRepo: SettingsRepository
 
-    // SAF: request SD card tree access
     private val sdCardPickerLauncher = registerForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
     ) { uri ->
         if (uri != null) {
-            // Persist permission across reboots
             contentResolver.takePersistableUriPermission(
                 uri,
                 Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
@@ -43,7 +45,6 @@ class MainActivity : AppCompatActivity() {
         setupNavigation()
         checkStoragePermissions()
 
-        // First launch: prompt for SD card if not already set
         if (!settingsRepo.isSdCardConfigured()) {
             promptForSdCard()
         }
@@ -51,8 +52,6 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupNavigation() {
         val navView: BottomNavigationView = binding.bottomNavigation
-
-        // Simple fragment transaction navigation
         navView.setOnItemSelectedListener { item ->
             when (item.itemId) {
                 R.id.nav_home -> showFragment("home")
@@ -63,42 +62,39 @@ class MainActivity : AppCompatActivity() {
             }
             true
         }
-
-        // Default fragment
         showFragment("home")
     }
 
     private fun showFragment(tag: String) {
         val fragment = when (tag) {
-            "home" -> ui.home.HomeFragment.newInstance()
-            "library" -> ui.library.LibraryFragment.newInstance()
-            "hacks" -> ui.hackworkflow.HackListFragment.newInstance()
-            "backups" -> ui.backuplog.BackupLogFragment.newInstance()
-            "settings" -> ui.settings.SettingsFragment.newInstance()
-            else -> ui.home.HomeFragment.newInstance()
+            "home" -> HomeFragment.newInstance()
+            "library" -> LibraryFragment.newInstance()
+            "hacks" -> HackListFragment.newInstance()
+            "backups" -> BackupLogFragment.newInstance()
+            "settings" -> SettingsFragment.newInstance()
+            else -> HomeFragment.newInstance()
         }
-
         supportFragmentManager.beginTransaction()
             .replace(R.id.fragment_container, fragment, tag)
             .commit()
     }
 
     private fun checkStoragePermissions() {
-        // Android 11+: request MANAGE_EXTERNAL_STORAGE for backup folder access
         if (!Environment.isExternalStorageManager()) {
-            val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
-                data = Uri.parse("package:$packageName")
+            try {
+                val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                    data = Uri.parse("package:$packageName")
+                }
+                startActivity(intent)
+            } catch (e: Exception) {
+                val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+                startActivity(intent)
             }
-            startActivity(intent)
         }
     }
 
     fun promptForSdCard() {
         Toast.makeText(this, "Select your SD card root folder", Toast.LENGTH_LONG).show()
         sdCardPickerLauncher.launch(null)
-    }
-
-    companion object {
-        const val REQUEST_SD_CARD = 1001
     }
 }

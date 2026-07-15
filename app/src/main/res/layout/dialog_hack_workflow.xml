@@ -10,31 +10,14 @@
         android:orientation="vertical"
         android:padding="20dp">
 
-        <!-- Title + file info -->
         <TextView
             android:id="@+id/tv_workflow_title"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:textSize="18sp"
             android:textStyle="bold"
-            android:layout_marginBottom="2dp"/>
-
-        <TextView
-            android:id="@+id/tv_file_name"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textSize="12sp"
-            android:alpha="0.6"
             android:layout_marginBottom="4dp"/>
 
-        <TextView
-            android:id="@+id/tv_current_code"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textSize="12sp"
-            android:layout_marginBottom="16dp"/>
-
-        <!-- Progress -->
         <ProgressBar
             android:id="@+id/progress_bar"
             android:layout_width="match_parent"
@@ -52,18 +35,82 @@
             android:visibility="gone"
             android:layout_marginBottom="8dp"/>
 
-        <!-- ── STEP 1: Confirm Name ── -->
+        <!-- ── STEP 1: Header Review (Fix #4) ── -->
         <LinearLayout
-            android:id="@+id/panel_step1_name"
+            android:id="@+id/panel_review_header"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:visibility="visible">
 
             <TextView
-                android:text="Step 1: Confirm Game Name"
+                android:text="Step 1: Review Header Info"
                 android:textSize="16sp"
                 android:textStyle="bold"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"/>
+
+            <androidx.cardview.widget.CardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardCornerRadius="6dp"
+                app:cardBackgroundColor="#1A2196F3"
+                android:layout_marginBottom="12dp">
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="12dp">
+
+                    <TextView
+                        android:text="FILENAME"
+                        android:textSize="10sp"
+                        android:alpha="0.6"
+                        android:letterSpacing="0.1"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"/>
+                    <TextView
+                        android:id="@+id/tv_file_name"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textSize="14sp"
+                        android:layout_marginBottom="8dp"/>
+
+                    <TextView
+                        android:text="HEADER TITLE (from ROM bytes)"
+                        android:textSize="10sp"
+                        android:alpha="0.6"
+                        android:letterSpacing="0.1"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"/>
+                    <TextView
+                        android:id="@+id/tv_header_title"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textSize="14sp"
+                        android:fontFamily="monospace"
+                        android:layout_marginBottom="8dp"/>
+
+                    <TextView
+                        android:text="HEADER GAME CODE"
+                        android:textSize="10sp"
+                        android:alpha="0.6"
+                        android:letterSpacing="0.1"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"/>
+                    <TextView
+                        android:id="@+id/tv_current_code"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textSize="14sp"
+                        android:fontFamily="monospace"/>
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+            <TextView
+                android:text="Confirm or edit the display name for this game:"
+                android:textSize="14sp"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="8dp"/>
@@ -72,7 +119,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:hint="Display name"
-                android:layout_marginBottom="12dp">
+                android:layout_marginBottom="16dp">
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/et_display_name"
                     android:layout_width="match_parent"
@@ -83,7 +130,7 @@
             <Button
                 android:id="@+id/btn_confirm_name"
                 android:text="Confirm Name →"
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"/>
         </LinearLayout>
 
@@ -104,7 +151,7 @@
                 android:layout_marginBottom="8dp"/>
 
             <TextView
-                android:text="This game code has existing artwork. Is this the right image?"
+                android:text="This game already has artwork assigned. Is this the correct image?"
                 android:textSize="14sp"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -123,15 +170,13 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal">
-
                 <Button
                     android:id="@+id/btn_art_correct"
-                    android:text="✓ Yes, correct"
+                    android:text="✓ Correct"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:layout_marginEnd="8dp"/>
-
                 <Button
                     android:id="@+id/btn_art_wrong"
                     style="@style/Widget.Material3.Button.OutlinedButton"
@@ -162,13 +207,14 @@
                 android:id="@+id/tv_new_code"
                 android:text="New code: generating..."
                 android:textSize="13sp"
+                android:fontFamily="monospace"
                 android:alpha="0.7"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="8dp"/>
 
             <TextView
-                android:text="Pick an image from your phone. It will be converted to the EZ Flash format (128×120 BMP)."
+                android:text="Pick an image from your phone. It will be converted to 128×120 BMP for the EZ Flash."
                 android:textSize="14sp"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -190,12 +236,12 @@
                 style="@style/Widget.Material3.Button.OutlinedButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"/>
+                android:layout_marginBottom="12dp"/>
 
             <TextView
-                android:text="⚠ The original ROM will be backed up to:\n/storage/emulated/0/ODE Rom Manager/backups/\nbefore any changes are made."
-                android:textSize="13sp"
-                android:alpha="0.7"
+                android:text="⚠ Original ROM will be backed up to:\n/storage/emulated/0/ODE Rom Manager/backups/"
+                android:textSize="12sp"
+                android:alpha="0.6"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="16dp"/>

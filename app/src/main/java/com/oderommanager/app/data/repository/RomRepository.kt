@@ -3,6 +3,7 @@ package com.oderommanager.app.data.repository
 import android.content.Context
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
+import androidx.lifecycle.LiveData
 import com.oderommanager.app.data.db.AppDatabase
 import com.oderommanager.app.data.model.*
 import com.oderommanager.app.util.*
@@ -17,77 +18,107 @@ class RomRepository(private val context: Context) {
     private val backupDao = db.backupLogDao()
     private val settingsRepo = SettingsRepository(context)
 
-    // LiveData for UI observation
     val allRoms = romDao.getAllRoms()
+    val allFolderNames = romDao.getAllFolderNames()
     val allBackupLogs = backupDao.getAllEntries()
     val pendingBackupCount = backupDao.getPendingCount()
+    val hackCandidates = romDao.getHackCandidates()
 
-    // ─── Scanning ─────────────────────────────────────────────────────────────
+    fun getRomsByFolder(folder: String): LiveData<List<RomEntry>> =
+        romDao.getRomsByFolder(folder)
 
-    /**
-     * Scan the SD card and update the ROM database.
-     * Returns count of newly discovered ROMs.
-     */
+    // ── Scanning ──────────────────────────────────────────────────────────────
+
     suspend fun scanSdCard(): ScanResult = withContext(Dispatchers.IO) {
         val sdUri = settingsRepo.getSdCardUri()
             ?: return@withContext ScanResult.Error("No SD card configured")
+        val settings = settingsRepo.getSettings()
+
+        // Fix #1: scan existing artwork first so we can mark ROMs correctly
+        val existingArtCodes = SdCardScanner.scanExistingArtwork(
+            context, sdUri, settings.firmwareType.imgsRelativePath
+        )
 
         val scanned = SdCardScanner.scanForRoms(context, sdUri)
         var newCount = 0
         var updatedCount = 0
 
         for (file in scanned) {
-            val existing = romDao.findByHash(
-                GbaHeaderUtil.computeMd5(context, file.uri) ?: continue
-            )
-            if (existing == null) {
-                val md5 = GbaHeaderUtil.computeMd5(context, file.uri) ?: continue
-                val header = if (file.systemType == SystemType.GBA) {
-                    GbaHeaderUtil.readHeader(context, file.uri)
-                } else null
+            val md5 = GbaHeaderUtil.computeMd5(context, file.uri) ?: continue
+            val existing = romDao.findByHash(md5)
 
+            // Read GBA header for title comparison (Fix #3)
+            val header = if (file.systemType == SystemType.GBA) {
+                GbaHeaderUtil.readHeader(context, file.uri)
+            } else null
+
+            // Fix #3: detect mismatch between header title and filename
+            val headerMismatch = if (header != null && header.isValid) {
+                val headerTitle = header.gameTitle.trim().uppercase()
+                val fileNameBase = file.name.substringBeforeLast('.').uppercase()
+                headerTitle.isNotBlank() && !fileNameBase.contains(headerTitle) &&
+                        !headerTitle.contains(fileNameBase.take(6))
+            } else false
+
+            // Fix #1: check if artwork already exists for this game's code
+            val gameCode = header?.gameCode?.trim()?.uppercase() ?: ""
+            val hasExistingArt = gameCode.isNotBlank() && existingArtCodes.contains(gameCode)
+
+            if (existing == null) {
                 val entry = RomEntry(
                     fileName = file.name,
                     originalFileName = file.name,
                     sdCardPath = file.uri.toString(),
+                    sdCardFolderPath = file.folderUri.toString(),
+                    folderName = file.folderName,
                     fileSizeBytes = file.sizeBytes,
                     md5Hash = md5,
                     displayName = RomNameUtil.cleanName(file.name),
                     systemType = file.systemType,
-                    originalGameCode = header?.gameCode,
-                    isRomHack = RomNameUtil.looksLikeHack(file.name)
+                    headerGameTitle = header?.gameTitle?.trim(),
+                    originalGameCode = header?.gameCode?.trim(),
+                    isRomHack = headerMismatch,
+                    headerMismatch = headerMismatch,
+                    hasArtwork = hasExistingArt,
+                    artworkPath = if (hasExistingArt) "IMGS/$gameCode" else null
                 )
                 romDao.insertOrUpdate(entry)
                 newCount++
             } else {
+                // Update existing entry with fresh header info and art status
+                val updated = existing.copy(
+                    sdCardFolderPath = file.folderUri.toString(),
+                    folderName = file.folderName,
+                    headerGameTitle = header?.gameTitle?.trim() ?: existing.headerGameTitle,
+                    headerMismatch = headerMismatch,
+                    isRomHack = headerMismatch || existing.isRomHack,
+                    hasArtwork = hasExistingArt || existing.hasArtwork,
+                    dateModified = System.currentTimeMillis()
+                )
+                romDao.update(updated)
                 updatedCount++
             }
         }
+
         ScanResult.Success(newCount, updatedCount, scanned.size)
     }
 
-    // ─── Artwork ──────────────────────────────────────────────────────────────
+    // ── Artwork ───────────────────────────────────────────────────────────────
 
-    /**
-     * Scrape and place artwork for a single GBA ROM.
-     */
     suspend fun scrapeArtwork(romEntry: RomEntry): ArtworkResult = withContext(Dispatchers.IO) {
         val settings = settingsRepo.getSettings()
         val api = ScreenScraperApi(settings.ssUsername, settings.ssPassword)
         val sdUri = settingsRepo.getSdCardUri()
             ?: return@withContext ArtworkResult.Error("No SD card configured")
 
-        // Step 1: find game on ScreenScraper
         val gameInfo = api.scrapeByHash(
-            romEntry.md5Hash,
-            romEntry.fileSizeBytes,
+            romEntry.md5Hash, romEntry.fileSizeBytes,
             region = settings.artworkRegion.ssRegionCode
         ) ?: api.scrapeByFilename(
             romEntry.fileName,
             region = settings.artworkRegion.ssRegionCode
         ) ?: return@withContext ArtworkResult.NotFound
 
-        // Step 2: download box art to temp file
         val artUrl = gameInfo.boxArtUrl
             ?: return@withContext ArtworkResult.NoArtAvailable
 
@@ -96,30 +127,22 @@ class RomRepository(private val context: Context) {
             return@withContext ArtworkResult.Error("Failed to download artwork")
         }
 
-        // Step 3: determine game code (use assigned hack code or original)
         val gameCode = romEntry.assignedGameCode
-            ?: romEntry.originalGameCode
+            ?: romEntry.originalGameCode?.trim()?.uppercase()
             ?: return@withContext ArtworkResult.Error("No game code available")
 
-        // Step 4: convert to BMP
         val bmpFile = File(context.cacheDir, "$gameCode.bmp")
         val converted = BmpConverter.convertToBmp(context, Uri.fromFile(tempFile), bmpFile)
         tempFile.delete()
-
         if (!converted) return@withContext ArtworkResult.Error("BMP conversion failed")
 
-        // Step 5: write to SD card IMGS folder
         val bmpBytes = bmpFile.readBytes()
         bmpFile.delete()
 
         val artUri = SdCardScanner.writeBmpToImgs(
-            context, sdUri,
-            settings.firmwareType.imgsRelativePath,
-            gameCode,
-            bmpBytes
+            context, sdUri, settings.firmwareType.imgsRelativePath, gameCode, bmpBytes
         ) ?: return@withContext ArtworkResult.Error("Failed to write BMP to SD card")
 
-        // Step 6: update DB
         val updated = romEntry.copy(
             hasArtwork = true,
             artworkPath = artUri.toString(),
@@ -128,89 +151,85 @@ class RomRepository(private val context: Context) {
             dateModified = System.currentTimeMillis()
         )
         romDao.update(updated)
-
         ArtworkResult.Success(gameInfo.gameName, gameInfo.matchMethod)
     }
 
-    // ─── ROM Renaming ─────────────────────────────────────────────────────────
+    suspend fun scrapeArtworkForFolder(folderName: String): BulkResult =
+        withContext(Dispatchers.IO) {
+            val roms = romDao.getRomsByFolder(folderName).value ?: emptyList()
+            val targets = roms.filter { it.systemType == SystemType.GBA && !it.hasArtwork }
+            var success = 0; var notFound = 0; var failed = 0
+            for (rom in targets) {
+                when (scrapeArtwork(rom)) {
+                    is ArtworkResult.Success -> success++
+                    is ArtworkResult.NotFound, is ArtworkResult.NoArtAvailable -> notFound++
+                    else -> failed++
+                }
+            }
+            BulkResult(success, notFound, failed, targets.size)
+        }
 
-    /**
-     * Rename a ROM file on the SD card and update the database.
-     */
+    // ── Renaming ──────────────────────────────────────────────────────────────
+
     suspend fun renameRom(romEntry: RomEntry, newDisplayName: String): RenameResult =
         withContext(Dispatchers.IO) {
-            val sdUri = settingsRepo.getSdCardUri()
-                ?: return@withContext RenameResult.Error("No SD card configured")
-
             val ext = romEntry.fileName.substringAfterLast('.')
             val newFileName = RomNameUtil.toFileName(newDisplayName, ext)
-
-            // Find the file on SD card
             val docFile = DocumentFile.fromSingleUri(
                 context, Uri.parse(romEntry.sdCardPath)
-            ) ?: return@withContext RenameResult.Error("File not found on SD card")
-
-            val renamed = docFile.renameTo(newFileName)
-            if (!renamed) return@withContext RenameResult.Error("Rename failed (SD card write error)")
-
-            // Update DB
-            val updated = romEntry.copy(
+            ) ?: return@withContext RenameResult.Error("File not found")
+            if (!docFile.renameTo(newFileName))
+                return@withContext RenameResult.Error("Rename failed")
+            romDao.update(romEntry.copy(
                 fileName = newFileName,
                 displayName = newDisplayName,
                 dateModified = System.currentTimeMillis()
-            )
-            romDao.update(updated)
+            ))
             RenameResult.Success(newFileName)
         }
 
-    // ─── ROM Hack Header Workflow ─────────────────────────────────────────────
+    suspend fun renameAllInFolder(folderName: String): BulkResult =
+        withContext(Dispatchers.IO) {
+            val roms = romDao.getRomsByFolder(folderName).value ?: emptyList()
+            var success = 0; var failed = 0
+            for (rom in roms) {
+                val suggested = RomNameUtil.cleanName(rom.fileName)
+                if (suggested != rom.displayName) {
+                    when (renameRom(rom, suggested)) {
+                        is RenameResult.Success -> success++
+                        else -> failed++
+                    }
+                }
+            }
+            BulkResult(success, 0, failed, roms.size)
+        }
 
-    /**
-     * Generate a unique 0XXX game code not used in DB, IMGS folder, or ScreenScraper.
-     */
+    // ── Hack workflow ─────────────────────────────────────────────────────────
+
     suspend fun generateUniqueCode(): String = withContext(Dispatchers.IO) {
         val settings = settingsRepo.getSettings()
         val sdUri = settingsRepo.getSdCardUri()
         val api = ScreenScraperApi(settings.ssUsername, settings.ssPassword)
-
-        // Pre-scan IMGS folder for used codes
         val usedInImgs = if (sdUri != null) {
             GameCodeGenerator.scanUsedCodesInImgs(
                 context, sdUri, settings.firmwareType.imgsRelativePath
             )
         } else emptySet()
-
         var attempts = 0
         while (attempts < 100) {
             val candidate = GameCodeGenerator.generateCandidate()
-
-            // Check 1: local DB
             val inDb = backupDao.findByGameCode(candidate) != null ||
                     romDao.findByAssignedCode(candidate) != null
             if (inDb) { attempts++; continue }
-
-            // Check 2: IMGS folder
             if (candidate in usedInImgs) { attempts++; continue }
-
-            // Check 3: ScreenScraper (only if credentials configured)
-            if (settings.ssUsername.isNotBlank()) {
-                val onSS = api.isGameCodeKnown(candidate)
-                if (onSS) { attempts++; continue }
+            if (settings.ssUsername.isNotBlank() && api.isGameCodeKnown(candidate)) {
+                attempts++; continue
             }
-
             return@withContext candidate
         }
-        // Extremely unlikely to reach here, but fallback
         GameCodeGenerator.generateCandidate()
     }
 
-    /**
-     * Execute the ROM hack header modification:
-     * 1. Copy original ROM to backup location
-     * 2. Write new game code to ROM header on SD card
-     * 3. Place artwork BMP in IMGS folder
-     * 4. Log everything to BackupLog DB
-     */
     suspend fun applyHackHeaderModification(
         romEntry: RomEntry,
         newDisplayName: String,
@@ -220,40 +239,29 @@ class RomRepository(private val context: Context) {
         val settings = settingsRepo.getSettings()
         val sdUri = settingsRepo.getSdCardUri()
             ?: return@withContext HackResult.Error("No SD card configured")
-
         val romUri = Uri.parse(romEntry.sdCardPath)
 
-        // Step 1: Backup the ROM to phone storage
         val backupDir = File(settings.backupFolderPath)
         backupDir.mkdirs()
         val backupFile = File(backupDir, romEntry.originalFileName)
-
         try {
             context.contentResolver.openInputStream(romUri)?.use { input ->
-                backupFile.outputStream().use { output ->
-                    input.copyTo(output)
-                }
+                backupFile.outputStream().use { input.copyTo(it) }
             } ?: return@withContext HackResult.Error("Could not read ROM for backup")
         } catch (e: Exception) {
             return@withContext HackResult.Error("Backup failed: ${e.message}")
         }
 
-        // Step 2: Write new game code to ROM on SD card
-        val writeSuccess = GbaHeaderUtil.writeGameCode(context, romUri, newGameCode)
-        if (!writeSuccess) {
-            backupFile.delete()  // clean up backup if write failed
+        if (!GbaHeaderUtil.writeGameCode(context, romUri, newGameCode)) {
+            backupFile.delete()
             return@withContext HackResult.Error("Failed to write game code to ROM")
         }
 
-        // Step 3: Place artwork BMP in IMGS folder
         val artUri = SdCardScanner.writeBmpToImgs(
-            context, sdUri,
-            settings.firmwareType.imgsRelativePath,
-            newGameCode,
-            artworkBmpBytes
+            context, sdUri, settings.firmwareType.imgsRelativePath,
+            newGameCode, artworkBmpBytes
         )
 
-        // Step 4: Log to BackupLog DB
         val logEntry = BackupLogEntry(
             displayName = newDisplayName,
             originalFileName = romEntry.originalFileName,
@@ -266,95 +274,71 @@ class RomRepository(private val context: Context) {
             dateModified = System.currentTimeMillis()
         )
         val logId = backupDao.insert(logEntry)
-
-        // Step 5: Update ROM entry in DB
-        val updatedRom = romEntry.copy(
+        romDao.update(romEntry.copy(
             displayName = newDisplayName,
             assignedGameCode = newGameCode,
             isRomHack = true,
+            headerMismatch = false,
             hasArtwork = artUri != null,
             artworkPath = artUri?.toString(),
             dateModified = System.currentTimeMillis()
-        )
-        romDao.update(updatedRom)
-
+        ))
         HackResult.Success(logId, backupFile.absolutePath)
     }
 
-    /**
-     * Confirm that a header modification worked.
-     * Marks the backup log entry as CONFIRMED.
-     */
     suspend fun confirmHackWorked(logId: Long) = withContext(Dispatchers.IO) {
         backupDao.updateStatus(logId, BackupStatus.CONFIRMED)
     }
 
-    /**
-     * Revert a header modification — restores original ROM from backup.
-     */
     suspend fun revertHack(logId: Long): RevertResult = withContext(Dispatchers.IO) {
         val logEntry = backupDao.getById(logId)
             ?: return@withContext RevertResult.Error("Log entry not found")
-
         val backupFile = File(logEntry.backupFilePath)
-        if (!backupFile.exists()) {
-            return@withContext RevertResult.Error("Backup file not found at ${logEntry.backupFilePath}")
-        }
-
+        if (!backupFile.exists())
+            return@withContext RevertResult.Error("Backup file not found")
         val sdUri = Uri.parse(logEntry.sdCardPath)
         try {
             backupFile.inputStream().use { input ->
-                context.contentResolver.openOutputStream(sdUri, "wt")?.use { output ->
-                    input.copyTo(output)
-                } ?: return@withContext RevertResult.Error("Cannot write to SD card — is it inserted?")
+                context.contentResolver.openOutputStream(sdUri, "wt")?.use { input.copyTo(it) }
+                    ?: return@withContext RevertResult.Error("Cannot write to SD card")
             }
         } catch (e: Exception) {
             return@withContext RevertResult.Error("Restore failed: ${e.message}")
         }
-
         backupDao.updateStatus(logId, BackupStatus.RESTORED)
         RevertResult.Success
     }
 
-    /**
-     * Delete a backup file from phone storage after confirmed.
-     */
     suspend fun deleteBackupFile(logId: Long): Boolean = withContext(Dispatchers.IO) {
         val logEntry = backupDao.getById(logId) ?: return@withContext false
-        val file = File(logEntry.backupFilePath)
-        val deleted = file.delete()
-        if (deleted) {
-            backupDao.updateStatus(logId, BackupStatus.CONFIRMED)
-        }
+        val deleted = File(logEntry.backupFilePath).delete()
+        if (deleted) backupDao.updateStatus(logId, BackupStatus.CONFIRMED)
         deleted
     }
 
-    // ─── Result types ─────────────────────────────────────────────────────────
+    // ── Result types ──────────────────────────────────────────────────────────
 
     sealed class ScanResult {
         data class Success(val newCount: Int, val updatedCount: Int, val totalFound: Int) : ScanResult()
         data class Error(val message: String) : ScanResult()
     }
-
     sealed class ArtworkResult {
         data class Success(val gameName: String, val matchMethod: String) : ArtworkResult()
         object NotFound : ArtworkResult()
         object NoArtAvailable : ArtworkResult()
         data class Error(val message: String) : ArtworkResult()
     }
-
     sealed class RenameResult {
         data class Success(val newFileName: String) : RenameResult()
         data class Error(val message: String) : RenameResult()
     }
-
     sealed class HackResult {
         data class Success(val logId: Long, val backupPath: String) : HackResult()
         data class Error(val message: String) : HackResult()
     }
-
     sealed class RevertResult {
         object Success : RevertResult()
         data class Error(val message: String) : RevertResult()
     }
+    data class BulkResult(val success: Int, val notFound: Int, val failed: Int, val total: Int)
 }

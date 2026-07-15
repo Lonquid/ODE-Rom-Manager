@@ -1,7 +1,5 @@
 package com.oderommanager.app.ui.hackworkflow
 
-import android.app.Activity
-import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.view.*
@@ -12,16 +10,6 @@ import com.bumptech.glide.Glide
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.oderommanager.app.databinding.DialogHackWorkflowBinding
 
-/**
- * Step-by-step workflow dialog for assigning a unique game code and artwork
- * to a GBA ROM hack.
- *
- * Steps:
- *  1. Confirm / edit display name
- *  2. Check existing game code against DB
- *     - Path A: code known → show stored art → confirm or go to Path B
- *     - Path B: unknown code → generate new code → user picks image → convert → backup → write
- */
 class HackWorkflowDialog : BottomSheetDialogFragment() {
 
     private var _binding: DialogHackWorkflowBinding? = null
@@ -31,9 +19,7 @@ class HackWorkflowDialog : BottomSheetDialogFragment() {
     private val imagePickerLauncher = registerForActivityResult(
         ActivityResultContracts.GetContent()
     ) { uri ->
-        if (uri != null) {
-            viewModel.onImageSelected(requireContext(), uri)
-        }
+        if (uri != null) viewModel.onImageSelected(requireContext(), uri)
     }
 
     override fun onCreateView(
@@ -46,30 +32,24 @@ class HackWorkflowDialog : BottomSheetDialogFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        val romId = arguments?.getLong(ARG_ROM_ID) ?: run {
-            dismiss()
-            return
-        }
+        val romId = arguments?.getLong(ARG_ROM_ID) ?: run { dismiss(); return }
         viewModel.initialize(requireContext(), romId)
 
-        // Observe current step
-        viewModel.currentStep.observe(viewLifecycleOwner) { step ->
-            showStep(step)
+        // Observe ROM data — populate header review panel (Fix #4)
+        viewModel.romEntry.observe(viewLifecycleOwner) { rom ->
+            if (rom == null) return@observe
+            binding.tvWorkflowTitle.text = rom.displayName
+            binding.tvFileName.text = rom.fileName
+            binding.tvHeaderTitle.text = if (!rom.headerGameTitle.isNullOrBlank())
+                rom.headerGameTitle else "(no title in header)"
+            binding.tvCurrentCode.text = rom.originalGameCode ?: "(none)"
+            binding.etDisplayName.setText(rom.displayName)
         }
 
-        viewModel.romEntry.observe(viewLifecycleOwner) { rom ->
-            if (rom != null) {
-                binding.tvWorkflowTitle.text = "Hack Workflow: ${rom.displayName}"
-                binding.etDisplayName.setText(rom.displayName)
-                binding.tvCurrentCode.text = "Header code: ${rom.originalGameCode ?: "none"}"
-                binding.tvFileName.text = rom.fileName
-            }
-        }
+        viewModel.currentStep.observe(viewLifecycleOwner) { step -> showStep(step) }
 
         viewModel.existingArtworkPath.observe(viewLifecycleOwner) { path ->
-            if (path != null) {
-                Glide.with(this).load(path).into(binding.ivExistingArt)
-            }
+            if (path != null) Glide.with(this).load(path).into(binding.ivExistingArt)
         }
 
         viewModel.generatedCode.observe(viewLifecycleOwner) { code ->
@@ -96,6 +76,7 @@ class HackWorkflowDialog : BottomSheetDialogFragment() {
                     binding.tvProgress.visibility = View.GONE
                     showStep(HackWorkflowViewModel.Step.COMPLETE)
                     binding.tvSuccessMessage.text = state.message
+                    setButtonsEnabled(true)
                 }
                 is HackWorkflowViewModel.OpState.Error -> {
                     binding.progressBar.visibility = View.GONE
@@ -111,55 +92,31 @@ class HackWorkflowDialog : BottomSheetDialogFragment() {
             }
         }
 
-        // ── Step 1: Name confirmation ──────────────────────────────────────
         binding.btnConfirmName.setOnClickListener {
             val name = binding.etDisplayName.text.toString().trim()
-            if (name.isBlank()) {
-                binding.etDisplayName.error = "Name cannot be empty"
-                return@setOnClickListener
-            }
-            viewModel.confirmName(name)
+            if (name.isBlank()) { binding.etDisplayName.error = "Name required"; return@setOnClickListener }
+            viewModel.confirmHeaderAndName(name)
         }
 
-        // ── Step 2A: Existing art confirmed ───────────────────────────────
-        binding.btnArtCorrect.setOnClickListener {
-            viewModel.confirmExistingArt(requireContext())
-        }
-
-        // ── Step 2A: Existing art wrong → start Path B ───────────────────
-        binding.btnArtWrong.setOnClickListener {
-            viewModel.rejectExistingArt()
-        }
-
-        // ── Step 2B: Pick image from phone ────────────────────────────────
-        binding.btnPickImage.setOnClickListener {
-            imagePickerLauncher.launch("image/*")
-        }
-
-        // ── Step 2B: Confirm and apply ────────────────────────────────────
+        binding.btnArtCorrect.setOnClickListener { viewModel.confirmExistingArt() }
+        binding.btnArtWrong.setOnClickListener { viewModel.rejectExistingArt() }
+        binding.btnPickImage.setOnClickListener { imagePickerLauncher.launch("image/*") }
         binding.btnConfirmAndApply.setOnClickListener {
             val name = binding.etDisplayName.text.toString().trim()
             viewModel.applyHackModification(requireContext(), name)
         }
-
-        // ── Complete: Done ─────────────────────────────────────────────────
-        binding.btnDone.setOnClickListener {
-            dismiss()
-        }
+        binding.btnDone.setOnClickListener { dismiss() }
     }
 
     private fun showStep(step: HackWorkflowViewModel.Step) {
-        // Hide all panels
-        binding.panelStep1Name.visibility = View.GONE
+        binding.panelReviewHeader.visibility = View.GONE
         binding.panelStep2aExistingArt.visibility = View.GONE
         binding.panelStep2bNewArt.visibility = View.GONE
         binding.panelComplete.visibility = View.GONE
-
-        // Show the relevant one
         when (step) {
-            HackWorkflowViewModel.Step.CONFIRM_NAME ->
-                binding.panelStep1Name.visibility = View.VISIBLE
-            HackWorkflowViewModel.Step.SHOW_EXISTING_ART ->
+            HackWorkflowViewModel.Step.REVIEW_HEADER ->
+                binding.panelReviewHeader.visibility = View.VISIBLE
+            HackWorkflowViewModel.Step.CONFIRM_EXISTING_ART ->
                 binding.panelStep2aExistingArt.visibility = View.VISIBLE
             HackWorkflowViewModel.Step.PICK_NEW_ART ->
                 binding.panelStep2bNewArt.visibility = View.VISIBLE
@@ -183,13 +140,8 @@ class HackWorkflowDialog : BottomSheetDialogFragment() {
 
     companion object {
         private const val ARG_ROM_ID = "rom_id"
-
-        fun newInstance(romId: Long): HackWorkflowDialog {
-            return HackWorkflowDialog().apply {
-                arguments = Bundle().apply {
-                    putLong(ARG_ROM_ID, romId)
-                }
-            }
+        fun newInstance(romId: Long) = HackWorkflowDialog().apply {
+            arguments = Bundle().apply { putLong(ARG_ROM_ID, romId) }
         }
     }
 }

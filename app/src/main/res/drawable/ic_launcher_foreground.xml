@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Simple cartridge icon -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M30,35 L78,35 L78,75 L30,75 Z"/>
+    <path
+        android:fillColor="#FF6200EE"
+        android:pathData="M38,43 L70,43 L70,55 L38,55 Z"/>
+    <path
+        android:fillColor="#FF6200EE"
+        android:pathData="M38,60 L54,60 L54,68 L38,68 Z"/>
+    <path
+        android:fillColor="#FF6200EE"
+        android:pathData="M58,60 L70,60 L70,68 L58,68 Z"/>
+</vector>

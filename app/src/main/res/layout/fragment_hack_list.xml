@@ -1,11 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- fragment_hack_list.xml -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="0dp">
+    android:orientation="vertical">
 
     <TextView
         android:text="ROM Hack Manager"
@@ -19,19 +16,27 @@
         android:id="@+id/tv_subtitle"
         android:textSize="13sp"
         android:paddingHorizontal="16dp"
-        android:paddingBottom="8dp"
+        android:paddingBottom="4dp"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="GBA ROMs only — tap a ROM to start the header workflow"/>
+        android:text="GBA ROMs where header title doesn't match filename"/>
+
+    <TextView
+        android:textSize="12sp"
+        android:paddingHorizontal="16dp"
+        android:paddingBottom="8dp"
+        android:alpha="0.6"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Tap a ROM to review its header and assign artwork"/>
 
     <Button
-        android:id="@+id/btn_start_bulk_queue"
-        android:text="Process Queue (0)"
+        android:id="@+id/btn_process_all"
+        android:text="Process All Unassigned"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginHorizontal="16dp"
-        android:layout_marginBottom="8dp"
-        android:visibility="gone"/>
+        android:layout_marginBottom="8dp"/>
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recycler_hack_roms"
@@ -43,7 +48,7 @@
         android:id="@+id/tv_empty"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="No GBA ROMs found. Scan your SD card from the Home tab."
+        android:text="No header mismatches found.\nAll your GBA ROMs have matching headers and filenames."
         android:gravity="center"
         android:padding="32dp"
         android:visibility="gone"/>

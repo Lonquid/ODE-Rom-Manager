@@ -12,22 +12,15 @@ import com.oderommanager.app.data.model.RomEntry
 import com.oderommanager.app.data.model.SystemType
 
 class Converters {
-    @TypeConverter
-    fun fromSystemType(value: SystemType): String = value.name
-
-    @TypeConverter
-    fun toSystemType(value: String): SystemType = SystemType.valueOf(value)
-
-    @TypeConverter
-    fun fromBackupStatus(value: BackupStatus): String = value.name
-
-    @TypeConverter
-    fun toBackupStatus(value: String): BackupStatus = BackupStatus.valueOf(value)
+    @TypeConverter fun fromSystemType(value: SystemType): String = value.name
+    @TypeConverter fun toSystemType(value: String): SystemType = SystemType.valueOf(value)
+    @TypeConverter fun fromBackupStatus(value: BackupStatus): String = value.name
+    @TypeConverter fun toBackupStatus(value: String): BackupStatus = BackupStatus.valueOf(value)
 }
 
 @Database(
     entities = [RomEntry::class, BackupLogEntry::class],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -37,20 +30,18 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun backupLogDao(): BackupLogDao
 
     companion object {
-        @Volatile
-        private var INSTANCE: AppDatabase? = null
+        @Volatile private var INSTANCE: AppDatabase? = null
 
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
-                val instance = Room.databaseBuilder(
+                Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
                     "ode_rom_manager.db"
                 )
                     .fallbackToDestructiveMigration()
                     .build()
-                INSTANCE = instance
-                instance
+                    .also { INSTANCE = it }
             }
         }
     }

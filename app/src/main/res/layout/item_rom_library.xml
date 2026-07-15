@@ -13,25 +13,51 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:padding="12dp"
+        android:padding="10dp"
         android:gravity="center_vertical">
 
-        <!-- Checkbox (bulk mode only) -->
-        <CheckBox
-            android:id="@+id/checkbox"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:visibility="gone"
-            android:layout_marginEnd="8dp"/>
-
-        <!-- Art status icon -->
-        <ImageView
-            android:id="@+id/iv_art_status"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
+        <!-- Thumbnail area: shows art if available, with optional "?" overlay -->
+        <FrameLayout
+            android:id="@+id/frame_thumbnail"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
             android:layout_marginEnd="12dp"
-            android:src="@android:drawable/presence_offline"
-            android:contentDescription="Art status"/>
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?attr/selectableItemBackground">
+
+            <!-- Artwork thumbnail (shown when hasArtwork = true) -->
+            <ImageView
+                android:id="@+id/iv_thumbnail"
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:scaleType="centerCrop"
+                android:visibility="gone"
+                android:contentDescription="Game artwork"/>
+
+            <!-- Placeholder icon (shown when hasArtwork = false) -->
+            <ImageView
+                android:id="@+id/iv_art_placeholder"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_art_missing"
+                android:contentDescription="No artwork"/>
+
+            <!-- Question mark badge (shown when art exists but not verified) -->
+            <TextView
+                android:id="@+id/tv_question_badge"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_gravity="bottom|end"
+                android:text="?"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:textColor="@android:color/white"
+                android:gravity="center"
+                android:background="#CC000000"
+                android:visibility="gone"/>
+        </FrameLayout>
 
         <!-- Text info -->
         <LinearLayout
@@ -44,7 +70,7 @@
                 android:id="@+id/tv_rom_name"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textSize="15sp"
+                android:textSize="14sp"
                 android:textStyle="bold"
                 android:maxLines="1"
                 android:ellipsize="end"/>
@@ -53,8 +79,8 @@
                 android:id="@+id/tv_file_name"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textSize="12sp"
-                android:alpha="0.6"
+                android:textSize="11sp"
+                android:alpha="0.55"
                 android:maxLines="1"
                 android:ellipsize="end"/>
 
@@ -62,18 +88,18 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:layout_marginTop="4dp">
+                android:layout_marginTop="3dp">
 
                 <com.google.android.material.chip.Chip
                     android:id="@+id/tv_system"
                     android:layout_width="wrap_content"
-                    android:layout_height="28dp"
+                    android:layout_height="24dp"
                     android:textSize="10sp"/>
 
                 <com.google.android.material.chip.Chip
                     android:id="@+id/chip_hack"
                     android:layout_width="wrap_content"
-                    android:layout_height="28dp"
+                    android:layout_height="24dp"
                     android:text="HACK"
                     android:textSize="10sp"
                     android:layout_marginStart="4dp"
@@ -93,7 +119,7 @@
                 style="@style/Widget.Material3.Button.TextButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textSize="12sp"/>
+                android:textSize="11sp"/>
 
             <Button
                 android:id="@+id/btn_scrape_art"
@@ -101,7 +127,7 @@
                 style="@style/Widget.Material3.Button.TextButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textSize="12sp"/>
+                android:textSize="11sp"/>
         </LinearLayout>
     </LinearLayout>
 </androidx.cardview.widget.CardView>

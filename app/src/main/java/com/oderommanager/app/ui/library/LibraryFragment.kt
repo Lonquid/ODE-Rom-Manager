@@ -10,14 +10,15 @@ import androidx.fragment.app.viewModels
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.chip.Chip
 import com.oderommanager.app.data.model.RomEntry
+import com.oderommanager.app.data.repository.SettingsRepository
 import com.oderommanager.app.databinding.FragmentLibraryBinding
+import com.oderommanager.app.util.SdCardScanner
 
 class LibraryFragment : Fragment() {
 
     private var _binding: FragmentLibraryBinding? = null
     private val binding get() = _binding!!
     private val viewModel: LibraryViewModel by viewModels()
-    private lateinit var adapter: RomLibraryAdapter
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
@@ -30,18 +31,17 @@ class LibraryFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         viewModel.initialize(requireContext())
 
-        adapter = RomLibraryAdapter(
+        val adapter = RomLibraryAdapter(
             onRenameClick = { rom -> showRenameDialog(rom) },
-            onScrapeArtClick = { rom -> viewModel.scrapeArtworkForRom(rom) }
+            onScrapeArtClick = { rom -> viewModel.scrapeArtworkForRom(rom) },
+            onThumbnailClick = { rom -> showArtConfirmDialog(rom) }
         )
         binding.recyclerRoms.layoutManager = LinearLayoutManager(requireContext())
         binding.recyclerRoms.adapter = adapter
 
-        // Observe folder list and build chips dynamically (Fix #5)
+        // Folder chips
         viewModel.folderNames.observe(viewLifecycleOwner) { folders ->
             binding.chipGroupFolders.removeAllViews()
-
-            // "All" chip
             val allChip = Chip(requireContext()).apply {
                 text = "All"
                 isCheckable = true
@@ -49,7 +49,6 @@ class LibraryFragment : Fragment() {
                 setOnClickListener { viewModel.filterByFolder(null) }
             }
             binding.chipGroupFolders.addView(allChip)
-
             folders.forEach { folder ->
                 val chip = Chip(requireContext()).apply {
                     text = folder
@@ -85,12 +84,22 @@ class LibraryFragment : Fragment() {
                     binding.btnBatchArt.isEnabled = true
                     Toast.makeText(requireContext(), state.message, Toast.LENGTH_SHORT).show()
                 }
-                is LibraryViewModel.OpState.Idle -> {
+                else -> {
                     binding.progressBar.visibility = View.GONE
                     binding.tvProgress.visibility = View.GONE
                     binding.btnBatchRename.isEnabled = true
                     binding.btnBatchArt.isEnabled = true
                 }
+            }
+        }
+
+        // Route to hack workflow if user wants to replace art
+        viewModel.replaceArtFor.observe(viewLifecycleOwner) { romId ->
+            if (romId != null) {
+                val dialog = com.oderommanager.app.ui.hackworkflow.HackWorkflowDialog
+                    .newInstance(romId)
+                dialog.show(parentFragmentManager, "replace_art")
+                viewModel.clearReplaceArtRequest()
             }
         }
 
@@ -102,25 +111,23 @@ class LibraryFragment : Fragment() {
             }
         })
 
-        // Batch rename — applies to current folder or all (Fix #2)
         binding.btnBatchRename.setOnClickListener {
             val folder = viewModel.currentFolder.value
             val scope = if (folder != null) "folder \"$folder\"" else "all games"
             AlertDialog.Builder(requireContext())
                 .setTitle("Batch Rename")
-                .setMessage("Auto-rename all ROMs in $scope?\n\nThis strips region tags and cleans filenames.")
+                .setMessage("Auto-rename all ROMs in $scope?\nStrips region tags, keeps translation credits.")
                 .setPositiveButton("Rename All") { _, _ -> viewModel.batchRename() }
                 .setNegativeButton("Cancel", null)
                 .show()
         }
 
-        // Batch art scrape (Fix #2)
         binding.btnBatchArt.setOnClickListener {
             val folder = viewModel.currentFolder.value
             val scope = if (folder != null) "folder \"$folder\"" else "all GBA games"
             AlertDialog.Builder(requireContext())
                 .setTitle("Batch Get Art")
-                .setMessage("Download artwork for all GBA ROMs in $scope that don't have art yet?\n\nRequires ScreenScraper credentials.")
+                .setMessage("Download artwork for GBA ROMs in $scope that don't have art yet?")
                 .setPositiveButton("Get Art") { _, _ -> viewModel.batchScrapeArt() }
                 .setNegativeButton("Cancel", null)
                 .show()
@@ -142,6 +149,34 @@ class LibraryFragment : Fragment() {
             }
             .setNegativeButton("Cancel", null)
             .show()
+    }
+
+    private fun showArtConfirmDialog(rom: RomEntry) {
+        val settings = SettingsRepository(requireContext()).getSettings()
+        val sdUri = SettingsRepository(requireContext()).getSdCardUri()
+
+        // Try to get the actual BMP URI from the SD card
+        val gameCode = rom.assignedGameCode
+            ?: rom.originalGameCode?.trim()?.uppercase()
+            ?: return
+
+        val artUri = if (sdUri != null) {
+            SdCardScanner.getArtworkUri(
+                requireContext(), sdUri,
+                settings.firmwareType.imgsRelativePath, gameCode
+            )?.toString() ?: rom.artworkPath
+        } else {
+            rom.artworkPath
+        } ?: return
+
+        val dialog = ArtConfirmDialog.newInstance(
+            romId = rom.id,
+            artUri = artUri,
+            gameName = rom.displayName,
+            gameCode = gameCode,
+            isVerified = rom.artVerified
+        )
+        dialog.show(childFragmentManager, "art_confirm")
     }
 
     override fun onDestroyView() {

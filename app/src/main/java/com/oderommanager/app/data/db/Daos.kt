@@ -22,9 +22,8 @@ interface RomEntryDao {
     @Query("SELECT * FROM rom_entries WHERE systemType = :systemType ORDER BY displayName ASC")
     fun getRomsBySystem(systemType: SystemType): LiveData<List<RomEntry>>
 
-    // Fix #3: header mismatch detection - returns GBA ROMs where header title doesn't match filename
-    @Query("""SELECT * FROM rom_entries WHERE systemType = 'GBA' 
-              AND (headerMismatch = 1 OR assignedGameCode IS NOT NULL) 
+    @Query("""SELECT * FROM rom_entries WHERE systemType = 'GBA'
+              AND (headerMismatch = 1 OR assignedGameCode IS NOT NULL)
               ORDER BY displayName ASC""")
     fun getHackCandidates(): LiveData<List<RomEntry>>
 
@@ -48,6 +47,9 @@ interface RomEntryDao {
 
     @Delete
     suspend fun delete(rom: RomEntry)
+
+    @Query("UPDATE rom_entries SET artVerified = :verified, dateModified = :ts WHERE id = :id")
+    suspend fun setArtVerified(id: Long, verified: Boolean, ts: Long = System.currentTimeMillis())
 
     @Query("SELECT COUNT(*) FROM rom_entries")
     suspend fun getTotalCount(): Int

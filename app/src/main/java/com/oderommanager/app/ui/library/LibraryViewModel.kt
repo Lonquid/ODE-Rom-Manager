@@ -25,6 +25,10 @@ class LibraryViewModel : ViewModel() {
     private val _operationState = MutableLiveData<OpState>(OpState.Idle)
     val operationState: LiveData<OpState> = _operationState
 
+    // Signal to open hack workflow for art replacement
+    private val _replaceArtFor = MutableLiveData<Long?>(null)
+    val replaceArtFor: LiveData<Long?> = _replaceArtFor
+
     fun initialize(context: Context) {
         repository = RomRepository(context)
         repository.allRoms.observeForever { roms ->
@@ -96,7 +100,7 @@ class LibraryViewModel : ViewModel() {
             _operationState.value = OpState.Loading("Scraping art for ${rom.displayName}...")
             when (val r = repository.scrapeArtwork(rom)) {
                 is RomRepository.ArtworkResult.Success ->
-                    _operationState.value = OpState.Done("Found art via ${r.matchMethod}: ${r.gameName}")
+                    _operationState.value = OpState.Done("Found: ${r.gameName} (${r.matchMethod})")
                 is RomRepository.ArtworkResult.NotFound ->
                     _operationState.value = OpState.Done("Not found on ScreenScraper")
                 is RomRepository.ArtworkResult.NoArtAvailable ->
@@ -112,14 +116,13 @@ class LibraryViewModel : ViewModel() {
             val roms = (_filteredRoms.value ?: return@launch)
                 .filter { it.systemType.name == "GBA" && !it.hasArtwork }
             if (roms.isEmpty()) {
-                _operationState.value = OpState.Done("All GBA ROMs in this view already have art!")
+                _operationState.value = OpState.Done("All GBA ROMs here already have art!")
                 return@launch
             }
             var success = 0; var notFound = 0; var failed = 0
             roms.forEachIndexed { i, rom ->
-                _operationState.value = OpState.Loading(
-                    "Getting art ${i + 1}/${roms.size}: ${rom.displayName}"
-                )
+                _operationState.value =
+                    OpState.Loading("Getting art ${i + 1}/${roms.size}: ${rom.displayName}")
                 when (repository.scrapeArtwork(rom)) {
                     is RomRepository.ArtworkResult.Success -> success++
                     is RomRepository.ArtworkResult.NotFound,
@@ -131,6 +134,21 @@ class LibraryViewModel : ViewModel() {
                 "Art done: $success found, $notFound not found, $failed errors"
             )
         }
+    }
+
+    fun verifyArt(romId: Long) {
+        viewModelScope.launch {
+            val rom = allRomsList.firstOrNull { it.id == romId } ?: return@launch
+            repository.verifyArt(rom)
+        }
+    }
+
+    fun requestReplaceArt(romId: Long) {
+        _replaceArtFor.value = romId
+    }
+
+    fun clearReplaceArtRequest() {
+        _replaceArtFor.value = null
     }
 
     sealed class OpState {

@@ -3,14 +3,11 @@ package com.oderommanager.app.util
 import android.content.Context
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
-import com.oderommanager.app.data.model.RomEntry
 import com.oderommanager.app.data.model.SystemType
 
 object SdCardScanner {
 
-    private val ROM_EXTENSIONS = SystemType.values()
-        .flatMap { it.extensions }
-        .toSet()
+    private val ROM_EXTENSIONS = SystemType.values().flatMap { it.extensions }.toSet()
 
     private val SKIP_FOLDERS = setOf(
         "imgs", "cheat", "system", "saver", "patch", "rts", "backup",
@@ -26,9 +23,6 @@ object SdCardScanner {
         val systemType: SystemType
     )
 
-    /**
-     * Scan all ROM files. Respects folder structure — each file knows its parent folder.
-     */
     fun scanForRoms(context: Context, sdCardUri: Uri): List<ScannedFile> {
         val root = DocumentFile.fromTreeUri(context, sdCardUri) ?: return emptyList()
         val results = mutableListOf<ScannedFile>()
@@ -46,7 +40,6 @@ object SdCardScanner {
             if (file.isDirectory) {
                 val name = file.name?.lowercase() ?: continue
                 if (name in SKIP_FOLDERS) continue
-                // Recurse — child files get this folder's name as their folder
                 scanDirectory(file, file.name ?: name, file.uri, results)
             } else if (file.isFile) {
                 val name = file.name ?: continue
@@ -54,24 +47,11 @@ object SdCardScanner {
                 if (ext !in ROM_EXTENSIONS) continue
                 val system = SystemType.fromExtension(ext)
                 if (system == SystemType.UNKNOWN) continue
-                results.add(
-                    ScannedFile(
-                        uri = file.uri,
-                        folderUri = folderUri,
-                        folderName = folderName,
-                        name = name,
-                        sizeBytes = file.length(),
-                        systemType = system
-                    )
-                )
+                results.add(ScannedFile(file.uri, folderUri, folderName, name, file.length(), system))
             }
         }
     }
 
-    /**
-     * Fix #1: Scan the IMGS folder and return all game codes that already have artwork.
-     * Returns a Set of 4-letter game codes (uppercase).
-     */
     fun scanExistingArtwork(
         context: Context,
         sdCardUri: Uri,
@@ -84,7 +64,6 @@ object SdCardScanner {
             for (segment in firmwareImgsPath.split("/")) {
                 imgsFolder = imgsFolder.findFile(segment) ?: return found
             }
-            // Walk /IMGS/X/X/XXXX.bmp
             for (firstDir in imgsFolder.listFiles()) {
                 if (!firstDir.isDirectory) continue
                 for (secondDir in firstDir.listFiles()) {
@@ -103,13 +82,36 @@ object SdCardScanner {
         }
     }
 
+    /**
+     * Returns the URI of an existing BMP for a given game code, or null if not found.
+     * Used to load thumbnail images for display.
+     */
+    fun getArtworkUri(
+        context: Context,
+        sdCardUri: Uri,
+        firmwareImgsPath: String,
+        gameCode: String
+    ): Uri? {
+        return try {
+            val root = DocumentFile.fromTreeUri(context, sdCardUri) ?: return null
+            var folder: DocumentFile = root
+            for (segment in firmwareImgsPath.split("/")) {
+                folder = folder.findFile(segment) ?: return null
+            }
+            val first = folder.findFile(gameCode[0].toString()) ?: return null
+            val second = first.findFile(gameCode[1].toString()) ?: return null
+            second.findFile("$gameCode.bmp")?.uri
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     fun detectFirmwareType(context: Context, sdCardUri: Uri): FirmwareDetectionResult {
         val root = DocumentFile.fromTreeUri(context, sdCardUri)
             ?: return FirmwareDetectionResult.UNKNOWN
         val systemFolder = root.findFile("SYSTEM")
         if (systemFolder != null && systemFolder.isDirectory) {
-            if (systemFolder.findFile("IMGS") != null)
-                return FirmwareDetectionResult.SIMPLE_DE
+            if (systemFolder.findFile("IMGS") != null) return FirmwareDetectionResult.SIMPLE_DE
         }
         if (root.findFile("IMGS") != null) return FirmwareDetectionResult.STOCK
         return FirmwareDetectionResult.UNKNOWN
@@ -147,9 +149,7 @@ object SdCardScanner {
         folder.findFile(bmpName)?.delete()
         val newFile = folder.createFile("image/bmp", bmpName) ?: return null
         return try {
-            context.contentResolver.openOutputStream(newFile.uri)?.use { out ->
-                out.write(bmpBytes)
-            }
+            context.contentResolver.openOutputStream(newFile.uri)?.use { it.write(bmpBytes) }
             newFile.uri
         } catch (e: Exception) {
             null

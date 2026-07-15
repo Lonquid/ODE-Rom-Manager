@@ -1,18 +1,21 @@
 package com.oderommanager.app.ui.library
 
+import android.net.Uri
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
 import com.oderommanager.app.R
 import com.oderommanager.app.data.model.RomEntry
 import com.oderommanager.app.databinding.ItemRomLibraryBinding
 
 class RomLibraryAdapter(
     private val onRenameClick: (RomEntry) -> Unit,
-    private val onScrapeArtClick: (RomEntry) -> Unit
+    private val onScrapeArtClick: (RomEntry) -> Unit,
+    private val onThumbnailClick: (RomEntry) -> Unit  // tap thumbnail to confirm/view
 ) : ListAdapter<RomEntry, RomLibraryAdapter.ViewHolder>(DIFF_CALLBACK) {
 
     inner class ViewHolder(val binding: ItemRomLibraryBinding) :
@@ -23,14 +26,39 @@ class RomLibraryAdapter(
             binding.tvFileName.text = rom.fileName
             binding.tvSystem.text = rom.systemType.displayName
 
-            binding.ivArtStatus.setImageResource(
-                if (rom.hasArtwork) R.drawable.ic_art_check else R.drawable.ic_art_missing
-            )
             binding.chipHack.visibility =
                 if (rom.headerMismatch || rom.isRomHack) View.VISIBLE else View.GONE
 
             binding.btnScrapeArt.visibility =
                 if (rom.systemType.name == "GBA") View.VISIBLE else View.GONE
+
+            // Thumbnail logic
+            if (rom.hasArtwork && !rom.artworkPath.isNullOrBlank()) {
+                // Show thumbnail
+                binding.ivThumbnail.visibility = View.VISIBLE
+                binding.ivArtPlaceholder.visibility = View.GONE
+
+                Glide.with(binding.root.context)
+                    .load(Uri.parse(rom.artworkPath))
+                    .placeholder(R.drawable.ic_art_missing)
+                    .error(R.drawable.ic_art_missing)
+                    .into(binding.ivThumbnail)
+
+                // Show "?" badge if art exists but hasn't been verified by user
+                val needsVerification = !rom.artVerified &&
+                        (rom.headerMismatch || rom.isRomHack)
+                binding.tvQuestionBadge.visibility =
+                    if (needsVerification) View.VISIBLE else View.GONE
+
+                // Tap to view full size / confirm
+                binding.frameThumbnail.setOnClickListener { onThumbnailClick(rom) }
+            } else {
+                // No art — show placeholder
+                binding.ivThumbnail.visibility = View.GONE
+                binding.ivArtPlaceholder.visibility = View.VISIBLE
+                binding.tvQuestionBadge.visibility = View.GONE
+                binding.frameThumbnail.setOnClickListener(null)
+            }
 
             binding.btnRename.setOnClickListener { onRenameClick(rom) }
             binding.btnScrapeArt.setOnClickListener { onScrapeArtClick(rom) }
@@ -38,7 +66,9 @@ class RomLibraryAdapter(
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) =
-        ViewHolder(ItemRomLibraryBinding.inflate(LayoutInflater.from(parent.context), parent, false))
+        ViewHolder(
+            ItemRomLibraryBinding.inflate(LayoutInflater.from(parent.context), parent, false)
+        )
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) =
         holder.bind(getItem(position))

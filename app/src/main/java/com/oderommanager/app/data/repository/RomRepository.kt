@@ -34,35 +34,37 @@ class RomRepository(private val context: Context) {
             ?: return@withContext ScanResult.Error("No SD card configured")
         val settings = settingsRepo.getSettings()
 
-        // Fix #1: scan existing artwork first so we can mark ROMs correctly
+        // Load existing artwork codes
         val existingArtCodes = SdCardScanner.scanExistingArtwork(
             context, sdUri, settings.firmwareType.imgsRelativePath
         )
 
+        // Load verified log from SD card root
+        val verifiedEntries = VerifiedLogUtil.readVerifiedEntries(context, sdUri)
+
         val scanned = SdCardScanner.scanForRoms(context, sdUri)
-        var newCount = 0
-        var updatedCount = 0
+        var newCount = 0; var updatedCount = 0
 
         for (file in scanned) {
             val md5 = GbaHeaderUtil.computeMd5(context, file.uri) ?: continue
             val existing = romDao.findByHash(md5)
 
-            // Read GBA header for title comparison (Fix #3)
-            val header = if (file.systemType == SystemType.GBA) {
-                GbaHeaderUtil.readHeader(context, file.uri)
-            } else null
+            val header = if (file.systemType == SystemType.GBA)
+                GbaHeaderUtil.readHeader(context, file.uri) else null
 
-            // Fix #3: detect mismatch between header title and filename
             val headerMismatch = if (header != null && header.isValid) {
                 val headerTitle = header.gameTitle.trim().uppercase()
                 val fileNameBase = file.name.substringBeforeLast('.').uppercase()
-                headerTitle.isNotBlank() && !fileNameBase.contains(headerTitle) &&
+                headerTitle.isNotBlank() &&
+                        !fileNameBase.contains(headerTitle) &&
                         !headerTitle.contains(fileNameBase.take(6))
             } else false
 
-            // Fix #1: check if artwork already exists for this game's code
             val gameCode = header?.gameCode?.trim()?.uppercase() ?: ""
             val hasExistingArt = gameCode.isNotBlank() && existingArtCodes.contains(gameCode)
+
+            // Check verified log — if this code is verified, honour it
+            val isVerified = verifiedEntries[gameCode]?.verified ?: false
 
             if (existing == null) {
                 val entry = RomEntry(
@@ -80,27 +82,55 @@ class RomRepository(private val context: Context) {
                     isRomHack = headerMismatch,
                     headerMismatch = headerMismatch,
                     hasArtwork = hasExistingArt,
+                    artVerified = isVerified,
                     artworkPath = if (hasExistingArt) "IMGS/$gameCode" else null
                 )
                 romDao.insertOrUpdate(entry)
                 newCount++
             } else {
-                // Update existing entry with fresh header info and art status
-                val updated = existing.copy(
+                romDao.update(existing.copy(
                     sdCardFolderPath = file.folderUri.toString(),
                     folderName = file.folderName,
                     headerGameTitle = header?.gameTitle?.trim() ?: existing.headerGameTitle,
                     headerMismatch = headerMismatch,
                     isRomHack = headerMismatch || existing.isRomHack,
                     hasArtwork = hasExistingArt || existing.hasArtwork,
+                    artVerified = isVerified || existing.artVerified,
                     dateModified = System.currentTimeMillis()
-                )
-                romDao.update(updated)
+                ))
                 updatedCount++
             }
         }
-
         ScanResult.Success(newCount, updatedCount, scanned.size)
+    }
+
+    // ── Art verification ──────────────────────────────────────────────────────
+
+    suspend fun verifyArt(romEntry: RomEntry): Boolean = withContext(Dispatchers.IO) {
+        val sdUri = settingsRepo.getSdCardUri() ?: return@withContext false
+        val gameCode = romEntry.assignedGameCode
+            ?: romEntry.originalGameCode?.trim()?.uppercase()
+            ?: return@withContext false
+
+        // Write to SD card log
+        VerifiedLogUtil.writeVerifiedEntry(
+            context, sdUri, gameCode, true, romEntry.displayName
+        )
+        // Update DB
+        romDao.setArtVerified(romEntry.id, true)
+        true
+    }
+
+    suspend fun unverifyArt(romEntry: RomEntry): Boolean = withContext(Dispatchers.IO) {
+        val sdUri = settingsRepo.getSdCardUri() ?: return@withContext false
+        val gameCode = romEntry.assignedGameCode
+            ?: romEntry.originalGameCode?.trim()?.uppercase()
+            ?: return@withContext false
+        VerifiedLogUtil.writeVerifiedEntry(
+            context, sdUri, gameCode, false, romEntry.displayName
+        )
+        romDao.setArtVerified(romEntry.id, false)
+        true
     }
 
     // ── Artwork ───────────────────────────────────────────────────────────────
@@ -115,17 +145,14 @@ class RomRepository(private val context: Context) {
             romEntry.md5Hash, romEntry.fileSizeBytes,
             region = settings.artworkRegion.ssRegionCode
         ) ?: api.scrapeByFilename(
-            romEntry.fileName,
-            region = settings.artworkRegion.ssRegionCode
+            romEntry.fileName, region = settings.artworkRegion.ssRegionCode
         ) ?: return@withContext ArtworkResult.NotFound
 
-        val artUrl = gameInfo.boxArtUrl
-            ?: return@withContext ArtworkResult.NoArtAvailable
+        val artUrl = gameInfo.boxArtUrl ?: return@withContext ArtworkResult.NoArtAvailable
 
         val tempFile = File(context.cacheDir, "temp_art_${System.currentTimeMillis()}.jpg")
-        if (!api.downloadImage(artUrl, tempFile)) {
+        if (!api.downloadImage(artUrl, tempFile))
             return@withContext ArtworkResult.Error("Failed to download artwork")
-        }
 
         val gameCode = romEntry.assignedGameCode
             ?: romEntry.originalGameCode?.trim()?.uppercase()
@@ -143,31 +170,16 @@ class RomRepository(private val context: Context) {
             context, sdUri, settings.firmwareType.imgsRelativePath, gameCode, bmpBytes
         ) ?: return@withContext ArtworkResult.Error("Failed to write BMP to SD card")
 
-        val updated = romEntry.copy(
+        romDao.update(romEntry.copy(
             hasArtwork = true,
             artworkPath = artUri.toString(),
+            artVerified = true,  // scraper-downloaded art is auto-verified
             scraperGameId = gameInfo.gameId,
             scraperMatchMethod = gameInfo.matchMethod,
             dateModified = System.currentTimeMillis()
-        )
-        romDao.update(updated)
+        ))
         ArtworkResult.Success(gameInfo.gameName, gameInfo.matchMethod)
     }
-
-    suspend fun scrapeArtworkForFolder(folderName: String): BulkResult =
-        withContext(Dispatchers.IO) {
-            val roms = romDao.getRomsByFolder(folderName).value ?: emptyList()
-            val targets = roms.filter { it.systemType == SystemType.GBA && !it.hasArtwork }
-            var success = 0; var notFound = 0; var failed = 0
-            for (rom in targets) {
-                when (scrapeArtwork(rom)) {
-                    is ArtworkResult.Success -> success++
-                    is ArtworkResult.NotFound, is ArtworkResult.NoArtAvailable -> notFound++
-                    else -> failed++
-                }
-            }
-            BulkResult(success, notFound, failed, targets.size)
-        }
 
     // ── Renaming ──────────────────────────────────────────────────────────────
 
@@ -175,9 +187,8 @@ class RomRepository(private val context: Context) {
         withContext(Dispatchers.IO) {
             val ext = romEntry.fileName.substringAfterLast('.')
             val newFileName = RomNameUtil.toFileName(newDisplayName, ext)
-            val docFile = DocumentFile.fromSingleUri(
-                context, Uri.parse(romEntry.sdCardPath)
-            ) ?: return@withContext RenameResult.Error("File not found")
+            val docFile = DocumentFile.fromSingleUri(context, Uri.parse(romEntry.sdCardPath))
+                ?: return@withContext RenameResult.Error("File not found")
             if (!docFile.renameTo(newFileName))
                 return@withContext RenameResult.Error("Rename failed")
             romDao.update(romEntry.copy(
@@ -188,40 +199,21 @@ class RomRepository(private val context: Context) {
             RenameResult.Success(newFileName)
         }
 
-    suspend fun renameAllInFolder(folderName: String): BulkResult =
-        withContext(Dispatchers.IO) {
-            val roms = romDao.getRomsByFolder(folderName).value ?: emptyList()
-            var success = 0; var failed = 0
-            for (rom in roms) {
-                val suggested = RomNameUtil.cleanName(rom.fileName)
-                if (suggested != rom.displayName) {
-                    when (renameRom(rom, suggested)) {
-                        is RenameResult.Success -> success++
-                        else -> failed++
-                    }
-                }
-            }
-            BulkResult(success, 0, failed, roms.size)
-        }
-
     // ── Hack workflow ─────────────────────────────────────────────────────────
 
     suspend fun generateUniqueCode(): String = withContext(Dispatchers.IO) {
         val settings = settingsRepo.getSettings()
         val sdUri = settingsRepo.getSdCardUri()
         val api = ScreenScraperApi(settings.ssUsername, settings.ssPassword)
-        val usedInImgs = if (sdUri != null) {
-            GameCodeGenerator.scanUsedCodesInImgs(
-                context, sdUri, settings.firmwareType.imgsRelativePath
-            )
-        } else emptySet()
+        val usedInImgs = if (sdUri != null) GameCodeGenerator.scanUsedCodesInImgs(
+            context, sdUri, settings.firmwareType.imgsRelativePath
+        ) else emptySet()
         var attempts = 0
         while (attempts < 100) {
             val candidate = GameCodeGenerator.generateCandidate()
             val inDb = backupDao.findByGameCode(candidate) != null ||
                     romDao.findByAssignedCode(candidate) != null
-            if (inDb) { attempts++; continue }
-            if (candidate in usedInImgs) { attempts++; continue }
+            if (inDb || candidate in usedInImgs) { attempts++; continue }
             if (settings.ssUsername.isNotBlank() && api.isGameCodeKnown(candidate)) {
                 attempts++; continue
             }
@@ -262,6 +254,9 @@ class RomRepository(private val context: Context) {
             newGameCode, artworkBmpBytes
         )
 
+        // Write to verified log since we just set up the art intentionally
+        VerifiedLogUtil.writeVerifiedEntry(context, sdUri, newGameCode, true, newDisplayName)
+
         val logEntry = BackupLogEntry(
             displayName = newDisplayName,
             originalFileName = romEntry.originalFileName,
@@ -280,6 +275,7 @@ class RomRepository(private val context: Context) {
             isRomHack = true,
             headerMismatch = false,
             hasArtwork = artUri != null,
+            artVerified = true,
             artworkPath = artUri?.toString(),
             dateModified = System.currentTimeMillis()
         ))

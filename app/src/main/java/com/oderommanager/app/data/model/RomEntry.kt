@@ -10,9 +10,9 @@ data class RomEntry(
 
     val fileName: String,
     val originalFileName: String,
-    val sdCardPath: String,         // URI of the file itself
-    val sdCardFolderPath: String,   // URI of the parent folder (for folder-aware browsing)
-    val folderName: String,         // human-readable folder name e.g. "GBA", "Pokemon"
+    val sdCardPath: String,
+    val sdCardFolderPath: String,
+    val folderName: String,
     val fileSizeBytes: Long,
     val md5Hash: String,
 
@@ -20,14 +20,20 @@ data class RomEntry(
     val systemType: SystemType,
 
     // GBA header fields
-    val headerGameTitle: String? = null,    // raw title from ROM header bytes 0xA0-0xAB
-    val originalGameCode: String? = null,   // 4-letter code from header 0xAC
-    val assignedGameCode: String? = null,   // our custom 0XXX code if hack
-    val isRomHack: Boolean = false,         // true if header title doesn't match filename
-    val headerMismatch: Boolean = false,    // specifically: header title vs filename mismatch
+    val headerGameTitle: String? = null,
+    val originalGameCode: String? = null,
+    val assignedGameCode: String? = null,
+    val isRomHack: Boolean = false,
+    val headerMismatch: Boolean = false,
 
-    val artworkPath: String? = null,
+    // Artwork
+    val artworkPath: String? = null,    // URI or path to the BMP on SD card
     val hasArtwork: Boolean = false,
+
+    // Verification state
+    // artVerified = true: user confirmed art is correct, no question mark
+    // artVerified = false + hasArtwork = true: show thumbnail with "?" overlay
+    val artVerified: Boolean = false,
 
     val scraperGameId: Long? = null,
     val scraperMatchMethod: String? = null,

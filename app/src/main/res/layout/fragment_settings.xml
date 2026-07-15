@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <TextView
+            android:text="Settings"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="20dp"/>
+
+        <!-- SD Card -->
+        <TextView android:text="SD CARD" android:textSize="12sp" android:alpha="0.5"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_marginBottom="4dp" android:letterSpacing="0.1"/>
+
+        <androidx.cardview.widget.CardView
+            xmlns:app="http://schemas.android.com/apk/res-auto"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            app:cardCornerRadius="8dp" android:layout_marginBottom="20dp">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="vertical" android:padding="16dp">
+                <TextView android:id="@+id/tv_sd_card_path" android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" android:textSize="14sp"
+                    android:layout_marginBottom="8dp" android:text="Not configured"/>
+                <Button android:id="@+id/btn_change_sd_card" android:text="Change SD Card"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+        <!-- ScreenScraper -->
+        <TextView android:text="SCREENSCRAPER.FR" android:textSize="12sp" android:alpha="0.5"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_marginBottom="4dp" android:letterSpacing="0.1"/>
+
+        <androidx.cardview.widget.CardView
+            xmlns:app="http://schemas.android.com/apk/res-auto"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            app:cardCornerRadius="8dp" android:layout_marginBottom="20dp">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="vertical" android:padding="16dp">
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:hint="Username" android:layout_marginBottom="8dp">
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/et_ss_username" android:layout_width="match_parent"
+                        android:layout_height="wrap_content" android:inputType="text"/>
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:hint="Password" android:layout_marginBottom="12dp"
+                    app:passwordToggleEnabled="true">
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/et_ss_password" android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="textPassword"/>
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <Button android:id="@+id/btn_save_credentials" android:text="Save Credentials"
+                    android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+        <!-- Firmware Type -->
+        <TextView android:text="FIRMWARE TYPE" android:textSize="12sp" android:alpha="0.5"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_marginBottom="4dp" android:letterSpacing="0.1"/>
+
+        <androidx.cardview.widget.CardView
+            xmlns:app="http://schemas.android.com/apk/res-auto"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            app:cardCornerRadius="8dp" android:layout_marginBottom="20dp">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="vertical" android:padding="16dp">
+                <RadioGroup android:layout_width="match_parent" android:layout_height="wrap_content">
+                    <RadioButton android:id="@+id/radio_simple_de" android:text="SimpleDE / Custom firmware (IMGS in /SYSTEM/IMGS/)"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"/>
+                    <RadioButton android:id="@+id/radio_stock" android:text="Stock kernel (IMGS at root /IMGS/)"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"/>
+                </RadioGroup>
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+        <!-- Artwork Region -->
+        <TextView android:text="ARTWORK REGION" android:textSize="12sp" android:alpha="0.5"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_marginBottom="4dp" android:letterSpacing="0.1"/>
+
+        <androidx.cardview.widget.CardView
+            xmlns:app="http://schemas.android.com/apk/res-auto"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            app:cardCornerRadius="8dp" android:layout_marginBottom="20dp">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="vertical" android:padding="16dp">
+                <RadioGroup android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+                    <RadioButton android:id="@+id/radio_usa" android:text="USA"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:layout_marginEnd="16dp"/>
+                    <RadioButton android:id="@+id/radio_europe" android:text="Europe"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:layout_marginEnd="16dp"/>
+                    <RadioButton android:id="@+id/radio_japan" android:text="Japan"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                </RadioGroup>
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+        <!-- Auto scan -->
+        <androidx.cardview.widget.CardView
+            xmlns:app="http://schemas.android.com/apk/res-auto"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            app:cardCornerRadius="8dp" android:layout_marginBottom="20dp">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="horizontal" android:padding="16dp" android:gravity="center_vertical">
+                <TextView android:text="Auto-scan on launch"
+                    android:layout_width="0dp" android:layout_height="wrap_content"
+                    android:layout_weight="1" android:textSize="15sp"/>
+                <androidx.appcompat.widget.SwitchCompat
+                    android:id="@+id/switch_auto_scan"
+                    android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+    </LinearLayout>
+</ScrollView>

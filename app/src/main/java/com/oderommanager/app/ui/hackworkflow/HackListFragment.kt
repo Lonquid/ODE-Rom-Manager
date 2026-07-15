@@ -8,10 +8,6 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.oderommanager.app.data.model.RomEntry
 import com.oderommanager.app.databinding.FragmentHackListBinding
 
-/**
- * Shows all GBA ROMs that may be hacks or need header assignment.
- * User selects a ROM to start the single-at-a-time hack workflow.
- */
 class HackListFragment : Fragment() {
 
     private var _binding: FragmentHackListBinding? = null
@@ -33,21 +29,19 @@ class HackListFragment : Fragment() {
         binding.recyclerHackRoms.layoutManager = LinearLayoutManager(requireContext())
         binding.recyclerHackRoms.adapter = adapter
 
-        viewModel.gbaRoms.observe(viewLifecycleOwner) { roms ->
+        viewModel.hackCandidates.observe(viewLifecycleOwner) { roms ->
             adapter.submitList(roms)
             binding.tvEmpty.visibility = if (roms.isEmpty()) View.VISIBLE else View.GONE
-            binding.tvSubtitle.text = "${roms.size} GBA ROMs · ${roms.count { it.isRomHack }} flagged as hacks"
+            val mismatch = roms.count { it.headerMismatch && it.assignedGameCode == null }
+            val assigned = roms.count { it.assignedGameCode != null }
+            binding.tvSubtitle.text =
+                "${roms.size} flagged · $mismatch header mismatches · $assigned already assigned"
         }
 
-        // Bulk queue: user can add items to a queue and process them sequentially
-        viewModel.hackQueue.observe(viewLifecycleOwner) { queue ->
-            binding.btnStartBulkQueue.visibility =
-                if (queue.isNotEmpty()) View.VISIBLE else View.GONE
-            binding.btnStartBulkQueue.text = "Process Queue (${queue.size})"
-        }
-
-        binding.btnStartBulkQueue.setOnClickListener {
-            viewModel.startBulkQueue()
+        binding.btnProcessAll.setOnClickListener {
+            val unprocessed = viewModel.hackCandidates.value
+                ?.filter { it.assignedGameCode == null } ?: return@setOnClickListener
+            if (unprocessed.isNotEmpty()) openHackWorkflow(unprocessed.first())
         }
 
         viewModel.openWorkflowFor.observe(viewLifecycleOwner) { rom ->

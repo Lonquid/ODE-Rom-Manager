@@ -1,5 +1,6 @@
 package com.oderommanager.app.ui.library
 
+import android.net.Uri
 import android.os.Bundle
 import android.view.*
 import android.widget.Toast
@@ -12,6 +13,7 @@ import com.google.android.material.chip.Chip
 import com.oderommanager.app.data.model.RomEntry
 import com.oderommanager.app.data.repository.SettingsRepository
 import com.oderommanager.app.databinding.FragmentLibraryBinding
+import com.oderommanager.app.ui.hackworkflow.HackWorkflowDialog
 import com.oderommanager.app.util.SdCardScanner
 
 class LibraryFragment : Fragment() {
@@ -19,6 +21,9 @@ class LibraryFragment : Fragment() {
     private var _binding: FragmentLibraryBinding? = null
     private val binding get() = _binding!!
     private val viewModel: LibraryViewModel by viewModels()
+
+    // Cache the resolved BMP URIs so we don't hit the SD card on every bind
+    private val artUriCache = mutableMapOf<String, Uri>() // gameCode -> URI
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
@@ -31,15 +36,30 @@ class LibraryFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         viewModel.initialize(requireContext())
 
+        val settingsRepo = SettingsRepository(requireContext())
+        val sdUri = settingsRepo.getSdCardUri()
+        val imgsPath = settingsRepo.getSettings().firmwareType.imgsRelativePath
+
         val adapter = RomLibraryAdapter(
             onRenameClick = { rom -> showRenameDialog(rom) },
             onScrapeArtClick = { rom -> viewModel.scrapeArtworkForRom(rom) },
-            onThumbnailClick = { rom -> showArtConfirmDialog(rom) }
+            onThumbnailClick = { rom -> showArtConfirmDialog(rom) },
+            // Fix #1: resolve the actual BMP URI from the SD card using the game code
+            getArtUri = { rom ->
+                val code = (rom.assignedGameCode ?: rom.originalGameCode)
+                    ?.trim()?.uppercase() ?: return@RomLibraryAdapter null
+                artUriCache.getOrPut(code) {
+                    if (sdUri != null) {
+                        SdCardScanner.getArtworkUri(requireContext(), sdUri, imgsPath, code)
+                            ?: return@RomLibraryAdapter null
+                    } else return@RomLibraryAdapter null
+                }
+            }
         )
+
         binding.recyclerRoms.layoutManager = LinearLayoutManager(requireContext())
         binding.recyclerRoms.adapter = adapter
 
-        // Folder chips
         viewModel.folderNames.observe(viewLifecycleOwner) { folders ->
             binding.chipGroupFolders.removeAllViews()
             val allChip = Chip(requireContext()).apply {
@@ -93,12 +113,9 @@ class LibraryFragment : Fragment() {
             }
         }
 
-        // Route to hack workflow if user wants to replace art
         viewModel.replaceArtFor.observe(viewLifecycleOwner) { romId ->
             if (romId != null) {
-                val dialog = com.oderommanager.app.ui.hackworkflow.HackWorkflowDialog
-                    .newInstance(romId)
-                dialog.show(parentFragmentManager, "replace_art")
+                HackWorkflowDialog.newInstance(romId).show(parentFragmentManager, "replace_art")
                 viewModel.clearReplaceArtRequest()
             }
         }
@@ -118,8 +135,7 @@ class LibraryFragment : Fragment() {
                 .setTitle("Batch Rename")
                 .setMessage("Auto-rename all ROMs in $scope?\nStrips region tags, keeps translation credits.")
                 .setPositiveButton("Rename All") { _, _ -> viewModel.batchRename() }
-                .setNegativeButton("Cancel", null)
-                .show()
+                .setNegativeButton("Cancel", null).show()
         }
 
         binding.btnBatchArt.setOnClickListener {
@@ -129,8 +145,7 @@ class LibraryFragment : Fragment() {
                 .setTitle("Batch Get Art")
                 .setMessage("Download artwork for GBA ROMs in $scope that don't have art yet?")
                 .setPositiveButton("Get Art") { _, _ -> viewModel.batchScrapeArt() }
-                .setNegativeButton("Cancel", null)
-                .show()
+                .setNegativeButton("Cancel", null).show()
         }
     }
 
@@ -147,36 +162,25 @@ class LibraryFragment : Fragment() {
                 val newName = input.text.toString().trim()
                 if (newName.isNotBlank()) viewModel.renameRom(rom, newName)
             }
-            .setNegativeButton("Cancel", null)
-            .show()
+            .setNegativeButton("Cancel", null).show()
     }
 
     private fun showArtConfirmDialog(rom: RomEntry) {
-        val settings = SettingsRepository(requireContext()).getSettings()
-        val sdUri = SettingsRepository(requireContext()).getSdCardUri()
-
-        // Try to get the actual BMP URI from the SD card
-        val gameCode = rom.assignedGameCode
-            ?: rom.originalGameCode?.trim()?.uppercase()
+        val settingsRepo = SettingsRepository(requireContext())
+        val sdUri = settingsRepo.getSdCardUri() ?: return
+        val imgsPath = settingsRepo.getSettings().firmwareType.imgsRelativePath
+        val gameCode = (rom.assignedGameCode ?: rom.originalGameCode)
+            ?.trim()?.uppercase() ?: return
+        val artUri = SdCardScanner.getArtworkUri(requireContext(), sdUri, imgsPath, gameCode)
             ?: return
 
-        val artUri = if (sdUri != null) {
-            SdCardScanner.getArtworkUri(
-                requireContext(), sdUri,
-                settings.firmwareType.imgsRelativePath, gameCode
-            )?.toString() ?: rom.artworkPath
-        } else {
-            rom.artworkPath
-        } ?: return
-
-        val dialog = ArtConfirmDialog.newInstance(
+        ArtConfirmDialog.newInstance(
             romId = rom.id,
-            artUri = artUri,
+            artUri = artUri.toString(),
             gameName = rom.displayName,
             gameCode = gameCode,
             isVerified = rom.artVerified
-        )
-        dialog.show(childFragmentManager, "art_confirm")
+        ).show(childFragmentManager, "art_confirm")
     }
 
     override fun onDestroyView() {

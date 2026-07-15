@@ -3,6 +3,7 @@ package com.oderommanager.app.ui.hackworkflow
 import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.*
+import com.oderommanager.app.data.db.AppDatabase
 import com.oderommanager.app.data.model.RomEntry
 import com.oderommanager.app.data.repository.RomRepository
 import com.oderommanager.app.util.BmpConverter
@@ -12,6 +13,7 @@ import java.io.File
 class HackWorkflowViewModel : ViewModel() {
 
     private lateinit var repository: RomRepository
+    private lateinit var db: AppDatabase
 
     val romEntry = MutableLiveData<RomEntry?>()
 
@@ -34,31 +36,29 @@ class HackWorkflowViewModel : ViewModel() {
 
     fun initialize(context: Context, romId: Long) {
         repository = RomRepository(context)
+        db = AppDatabase.getInstance(context)
+
+        // Fix #2: query DB directly instead of relying on LiveData.value being populated
         viewModelScope.launch {
-            // Fix #4: load rom and go straight to header review step
-            val rom = repository.allRoms.value?.firstOrNull { it.id == romId }
-                ?: repository.allRoms.value?.firstOrNull()
+            val rom = db.romEntryDao().getById(romId)
             romEntry.value = rom
             confirmedName = rom?.displayName ?: ""
         }
     }
 
-    // Step 1: User reviews header info and confirms or edits the name
     fun confirmHeaderAndName(name: String) {
         confirmedName = name
         val rom = romEntry.value ?: return
 
         viewModelScope.launch {
-            _operationState.value = OpState.Loading("Checking game code...")
+            _operationState.value = OpState.Loading("Checking...")
 
             val gameCode = rom.assignedGameCode ?: rom.originalGameCode?.trim()?.uppercase()
 
-            if (!gameCode.isNullOrBlank() && rom.hasArtwork && rom.artworkPath != null) {
-                // Art already exists for this code — show it for confirmation
+            if (!gameCode.isNullOrBlank() && rom.hasArtwork) {
                 _existingArtworkPath.value = rom.artworkPath
                 _currentStep.value = Step.CONFIRM_EXISTING_ART
             } else {
-                // No art yet — generate a new code and go to image picking
                 val newCode = repository.generateUniqueCode()
                 _generatedCode.value = newCode
                 _currentStep.value = Step.PICK_NEW_ART
@@ -69,7 +69,7 @@ class HackWorkflowViewModel : ViewModel() {
 
     fun confirmExistingArt() {
         _operationState.value = OpState.Success(
-            "✓ Artwork already in place for ${romEntry.value?.displayName}\nNo changes needed."
+            "✓ Artwork confirmed for ${romEntry.value?.displayName}\nNo changes needed."
         )
     }
 
@@ -105,13 +105,14 @@ class HackWorkflowViewModel : ViewModel() {
         }
         viewModelScope.launch {
             _operationState.value = OpState.Loading("Backing up ROM and writing new header...")
-            when (val result = repository.applyHackHeaderModification(rom, displayName, newCode, bmpBytes)) {
-                is RomRepository.HackResult.Success -> {
+            when (val result = repository.applyHackHeaderModification(
+                rom, displayName, newCode, bmpBytes
+            )) {
+                is RomRepository.HackResult.Success ->
                     _operationState.value = OpState.Success(
                         "✓ Done!\n\nNew code: $newCode\nBackup at:\n${result.backupPath}\n\n" +
-                                "Test it on your EZ Flash, then go to the Backups tab to confirm or revert."
+                                "Test it on your EZ Flash, then visit Backups tab to confirm or revert."
                     )
-                }
                 is RomRepository.HackResult.Error ->
                     _operationState.value = OpState.Error(result.message)
             }
@@ -119,7 +120,7 @@ class HackWorkflowViewModel : ViewModel() {
     }
 
     enum class Step {
-        REVIEW_HEADER,          // Fix #4: show header info first
+        REVIEW_HEADER,
         CONFIRM_EXISTING_ART,
         PICK_NEW_ART,
         COMPLETE

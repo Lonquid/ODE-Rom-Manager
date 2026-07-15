@@ -13,10 +13,9 @@ class HackWorkflowViewModel : ViewModel() {
 
     private lateinit var repository: RomRepository
 
-    private val _romEntry = MutableLiveData<RomEntry?>()
-    val romEntry: LiveData<RomEntry?> = _romEntry
+    val romEntry = MutableLiveData<RomEntry?>()
 
-    private val _currentStep = MutableLiveData(Step.CONFIRM_NAME)
+    private val _currentStep = MutableLiveData(Step.REVIEW_HEADER)
     val currentStep: LiveData<Step> = _currentStep
 
     private val _existingArtworkPath = MutableLiveData<String?>()
@@ -25,8 +24,7 @@ class HackWorkflowViewModel : ViewModel() {
     private val _generatedCode = MutableLiveData<String>()
     val generatedCode: LiveData<String> = _generatedCode
 
-    private val _selectedImageUri = MutableLiveData<Uri?>()
-    val selectedImageUri: LiveData<Uri?> = _selectedImageUri
+    val selectedImageUri = MutableLiveData<Uri?>()
 
     private val _operationState = MutableLiveData<OpState>(OpState.Idle)
     val operationState: LiveData<OpState> = _operationState
@@ -37,130 +35,92 @@ class HackWorkflowViewModel : ViewModel() {
     fun initialize(context: Context, romId: Long) {
         repository = RomRepository(context)
         viewModelScope.launch {
+            // Fix #4: load rom and go straight to header review step
             val rom = repository.allRoms.value?.firstOrNull { it.id == romId }
-            _romEntry.value = rom
+                ?: repository.allRoms.value?.firstOrNull()
+            romEntry.value = rom
             confirmedName = rom?.displayName ?: ""
         }
     }
 
-    // ── Step 1: Confirm name ───────────────────────────────────────────────
-
-    fun confirmName(name: String) {
+    // Step 1: User reviews header info and confirms or edits the name
+    fun confirmHeaderAndName(name: String) {
         confirmedName = name
-        val rom = _romEntry.value ?: return
+        val rom = romEntry.value ?: return
 
         viewModelScope.launch {
             _operationState.value = OpState.Loading("Checking game code...")
 
-            val gameCode = rom.originalGameCode
-            if (gameCode.isNullOrBlank() || gameCode == "????") {
-                // No valid code — go straight to Path B
-                generateNewCode()
-                _currentStep.value = Step.PICK_NEW_ART
-                _operationState.value = OpState.Idle
-                return@launch
-            }
+            val gameCode = rom.assignedGameCode ?: rom.originalGameCode?.trim()?.uppercase()
 
-            // Check if this code is already in our DB with artwork
-            val existingLog = repository.allBackupLogs.value
-                ?.firstOrNull { it.originalGameCode == gameCode || it.newGameCode == gameCode }
-
-            val artworkPath = rom.artworkPath ?: existingLog?.artworkSdPath
-
-            if (artworkPath != null) {
-                // Path A: we have art for this code
-                _existingArtworkPath.value = artworkPath
-                _currentStep.value = Step.SHOW_EXISTING_ART
+            if (!gameCode.isNullOrBlank() && rom.hasArtwork && rom.artworkPath != null) {
+                // Art already exists for this code — show it for confirmation
+                _existingArtworkPath.value = rom.artworkPath
+                _currentStep.value = Step.CONFIRM_EXISTING_ART
             } else {
-                // Path B: no art found
-                generateNewCode()
+                // No art yet — generate a new code and go to image picking
+                val newCode = repository.generateUniqueCode()
+                _generatedCode.value = newCode
                 _currentStep.value = Step.PICK_NEW_ART
             }
-
             _operationState.value = OpState.Idle
         }
     }
 
-    // ── Step 2A: Existing art ─────────────────────────────────────────────
-
-    fun confirmExistingArt(context: Context) {
-        val rom = _romEntry.value ?: return
-        val artPath = _existingArtworkPath.value ?: return
-
-        viewModelScope.launch {
-            _operationState.value = OpState.Loading("Placing artwork...")
-            // Artwork already exists or is already placed — just ensure the BMP is in IMGS
-            // In this case the game code doesn't change, art is already there
-            _operationState.value = OpState.Success(
-                "✓ Artwork confirmed for ${rom.displayName}\nNo header change needed."
-            )
-        }
+    fun confirmExistingArt() {
+        _operationState.value = OpState.Success(
+            "✓ Artwork already in place for ${romEntry.value?.displayName}\nNo changes needed."
+        )
     }
 
     fun rejectExistingArt() {
         viewModelScope.launch {
-            generateNewCode()
+            val newCode = repository.generateUniqueCode()
+            _generatedCode.value = newCode
             _currentStep.value = Step.PICK_NEW_ART
         }
     }
 
-    // ── Step 2B: New art ──────────────────────────────────────────────────
-
-    private suspend fun generateNewCode() {
-        val code = repository.generateUniqueCode()
-        _generatedCode.value = code
-    }
-
     fun onImageSelected(context: Context, uri: Uri) {
-        _selectedImageUri.value = uri
-
-        // Pre-convert to BMP in background
+        selectedImageUri.value = uri
         viewModelScope.launch {
-            _operationState.value = OpState.Loading("Converting image...")
+            _operationState.value = OpState.Loading("Converting image to EZ Flash BMP format...")
             val tempFile = File(context.cacheDir, "preview_bmp_${System.currentTimeMillis()}.bmp")
-            val success = BmpConverter.convertToBmp(context, uri, tempFile)
-            if (success) {
+            if (BmpConverter.convertToBmp(context, uri, tempFile)) {
                 convertedBmpBytes = tempFile.readBytes()
                 tempFile.delete()
                 _operationState.value = OpState.Idle
             } else {
-                _operationState.value = OpState.Error("Could not convert image to BMP format")
+                _operationState.value = OpState.Error("Could not convert image")
             }
         }
     }
 
     fun applyHackModification(context: Context, displayName: String) {
-        val rom = _romEntry.value ?: return
+        val rom = romEntry.value ?: return
         val newCode = _generatedCode.value ?: return
         val bmpBytes = convertedBmpBytes ?: run {
             _operationState.value = OpState.Error("No image converted yet")
             return
         }
-
         viewModelScope.launch {
-            _operationState.value = OpState.Loading("Backing up ROM...")
-
-            when (val result = repository.applyHackHeaderModification(
-                rom, displayName, newCode, bmpBytes
-            )) {
+            _operationState.value = OpState.Loading("Backing up ROM and writing new header...")
+            when (val result = repository.applyHackHeaderModification(rom, displayName, newCode, bmpBytes)) {
                 is RomRepository.HackResult.Success -> {
                     _operationState.value = OpState.Success(
-                        "✓ Done!\n\nGame code: $newCode\n" +
-                                "Backup saved to:\n${result.backupPath}\n\n" +
-                                "Insert the EZ Flash and test the game. " +
-                                "Then visit the Backups tab to confirm or revert."
+                        "✓ Done!\n\nNew code: $newCode\nBackup at:\n${result.backupPath}\n\n" +
+                                "Test it on your EZ Flash, then go to the Backups tab to confirm or revert."
                     )
                 }
-                is RomRepository.HackResult.Error -> {
+                is RomRepository.HackResult.Error ->
                     _operationState.value = OpState.Error(result.message)
-                }
             }
         }
     }
 
     enum class Step {
-        CONFIRM_NAME,
-        SHOW_EXISTING_ART,
+        REVIEW_HEADER,          // Fix #4: show header info first
+        CONFIRM_EXISTING_ART,
         PICK_NEW_ART,
         COMPLETE
     }

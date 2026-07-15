@@ -10,14 +10,23 @@ import com.oderommanager.app.data.model.SystemType
 @Dao
 interface RomEntryDao {
 
-    @Query("SELECT * FROM rom_entries ORDER BY displayName ASC")
+    @Query("SELECT * FROM rom_entries ORDER BY folderName ASC, displayName ASC")
     fun getAllRoms(): LiveData<List<RomEntry>>
+
+    @Query("SELECT DISTINCT folderName FROM rom_entries ORDER BY folderName ASC")
+    fun getAllFolderNames(): LiveData<List<String>>
+
+    @Query("SELECT * FROM rom_entries WHERE folderName = :folder ORDER BY displayName ASC")
+    fun getRomsByFolder(folder: String): LiveData<List<RomEntry>>
 
     @Query("SELECT * FROM rom_entries WHERE systemType = :systemType ORDER BY displayName ASC")
     fun getRomsBySystem(systemType: SystemType): LiveData<List<RomEntry>>
 
-    @Query("SELECT * FROM rom_entries WHERE isRomHack = 1 ORDER BY displayName ASC")
-    fun getRomHacks(): LiveData<List<RomEntry>>
+    // Fix #3: header mismatch detection - returns GBA ROMs where header title doesn't match filename
+    @Query("""SELECT * FROM rom_entries WHERE systemType = 'GBA' 
+              AND (headerMismatch = 1 OR assignedGameCode IS NOT NULL) 
+              ORDER BY displayName ASC""")
+    fun getHackCandidates(): LiveData<List<RomEntry>>
 
     @Query("SELECT * FROM rom_entries WHERE hasArtwork = 0 AND systemType = 'GBA' ORDER BY displayName ASC")
     fun getGbaRomsMissingArtwork(): LiveData<List<RomEntry>>
@@ -40,16 +49,13 @@ interface RomEntryDao {
     @Delete
     suspend fun delete(rom: RomEntry)
 
-    @Query("DELETE FROM rom_entries WHERE sdCardPath = :path")
-    suspend fun deleteByPath(path: String)
-
     @Query("SELECT COUNT(*) FROM rom_entries")
     suspend fun getTotalCount(): Int
 
     @Query("SELECT COUNT(*) FROM rom_entries WHERE hasArtwork = 1")
     suspend fun getArtworkCount(): Int
 
-    @Query("SELECT COUNT(*) FROM rom_entries WHERE isRomHack = 1")
+    @Query("SELECT COUNT(*) FROM rom_entries WHERE headerMismatch = 1")
     suspend fun getHackCount(): Int
 }
 
@@ -58,9 +64,6 @@ interface BackupLogDao {
 
     @Query("SELECT * FROM backup_log ORDER BY dateModified DESC")
     fun getAllEntries(): LiveData<List<BackupLogEntry>>
-
-    @Query("SELECT * FROM backup_log WHERE status = 'PENDING' ORDER BY dateModified DESC")
-    fun getPendingEntries(): LiveData<List<BackupLogEntry>>
 
     @Query("SELECT * FROM backup_log WHERE id = :id")
     suspend fun getById(id: Long): BackupLogEntry?

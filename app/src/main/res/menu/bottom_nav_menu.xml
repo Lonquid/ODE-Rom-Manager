@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/nav_home"
+        android:icon="@android:drawable/ic_menu_info_details"
+        android:title="Home"/>
+    <item
+        android:id="@+id/nav_library"
+        android:icon="@android:drawable/ic_menu_agenda"
+        android:title="Library"/>
+    <item
+        android:id="@+id/nav_hacks"
+        android:icon="@android:drawable/ic_menu_edit"
+        android:title="Hacks"/>
+    <item
+        android:id="@+id/nav_backups"
+        android:icon="@android:drawable/ic_menu_save"
+        android:title="Backups"/>
+    <item
+        android:id="@+id/nav_settings"
+        android:icon="@android:drawable/ic_menu_preferences"
+        android:title="Settings"/>
+</menu>

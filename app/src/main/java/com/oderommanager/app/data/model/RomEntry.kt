@@ -3,40 +3,35 @@ package com.oderommanager.app.data.model
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
-/**
- * Represents a ROM file tracked by the app.
- * Covers both standard ROMs (renamed/art scraped) and ROM hacks (header modified).
- */
 @Entity(tableName = "rom_entries")
 data class RomEntry(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
 
-    // File identity
-    val fileName: String,           // current filename on SD card
-    val originalFileName: String,   // filename before any rename
-    val sdCardPath: String,         // full URI path on SD card
+    val fileName: String,
+    val originalFileName: String,
+    val sdCardPath: String,         // URI of the file itself
+    val sdCardFolderPath: String,   // URI of the parent folder (for folder-aware browsing)
+    val folderName: String,         // human-readable folder name e.g. "GBA", "Pokemon"
     val fileSizeBytes: Long,
-    val md5Hash: String,            // computed at scan time
+    val md5Hash: String,
 
-    // Game metadata
-    val displayName: String,        // cleaned display name (e.g. "Pokemon FireRed Version")
-    val systemType: SystemType,     // GBA, GB, GBC, NES, etc.
+    val displayName: String,
+    val systemType: SystemType,
 
-    // GBA header fields (GBA only)
-    val originalGameCode: String? = null,   // 4-letter code from header at 0xAC
-    val assignedGameCode: String? = null,   // our custom code (0XXX) if hack
-    val isRomHack: Boolean = false,
+    // GBA header fields
+    val headerGameTitle: String? = null,    // raw title from ROM header bytes 0xA0-0xAB
+    val originalGameCode: String? = null,   // 4-letter code from header 0xAC
+    val assignedGameCode: String? = null,   // our custom 0XXX code if hack
+    val isRomHack: Boolean = false,         // true if header title doesn't match filename
+    val headerMismatch: Boolean = false,    // specifically: header title vs filename mismatch
 
-    // Art status
-    val artworkPath: String? = null,        // path on SD card to placed BMP
+    val artworkPath: String? = null,
     val hasArtwork: Boolean = false,
 
-    // Scraper metadata
-    val scraperGameId: Long? = null,        // ScreenScraper game ID
-    val scraperMatchMethod: String? = null, // "hash", "filename", "manual"
+    val scraperGameId: Long? = null,
+    val scraperMatchMethod: String? = null,
 
-    // Timestamps
     val dateAdded: Long = System.currentTimeMillis(),
     val dateModified: Long = System.currentTimeMillis()
 )

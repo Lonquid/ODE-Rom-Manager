@@ -19,16 +19,12 @@ interface RomEntryDao {
     @Query("SELECT * FROM rom_entries WHERE folderName = :folder ORDER BY displayName ASC")
     fun getRomsByFolder(folder: String): LiveData<List<RomEntry>>
 
-    // All GBA ROMs — shown in Mismatches tab, user runs scan to populate mismatchType
     @Query("SELECT * FROM rom_entries WHERE systemType = 'GBA' ORDER BY mismatchType ASC, displayName ASC")
     fun getAllGbaRoms(): LiveData<List<RomEntry>>
 
-    // ROMs that have been scanned and confirmed as mismatches or unknowns
-    @Query("""SELECT * FROM rom_entries WHERE systemType = 'GBA'
-              AND mismatchType IN ('HACK','UNKNOWN_SERIAL')
-              AND assignedGameCode IS NULL
-              ORDER BY displayName ASC""")
-    fun getConfirmedMismatches(): LiveData<List<RomEntry>>
+    // Direct suspend query for use in coroutines — avoids LiveData.value being null
+    @Query("SELECT * FROM rom_entries WHERE systemType = 'GBA' ORDER BY displayName ASC")
+    suspend fun getAllGbaRomsDirect(): List<RomEntry>
 
     @Query("SELECT * FROM rom_entries WHERE hasArtwork = 0 AND systemType = 'GBA'")
     fun getGbaRomsMissingArtwork(): LiveData<List<RomEntry>>

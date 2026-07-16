@@ -41,7 +41,7 @@ class HomeViewModel : ViewModel() {
         romRepository.allRoms.observeForever { roms ->
             _totalRoms.value = roms.size
             _romsWithArt.value = roms.count { it.hasArtwork }
-            _romHacks.value = roms.count { it.isRomHack }
+            _romHacks.value = roms.count { it.headerMismatch || it.mismatchType == "HACK" || it.mismatchType == "UNKNOWN_SERIAL" }
         }
 
         romRepository.pendingBackupCount.observeForever { count ->

@@ -11,6 +11,7 @@ class HackListViewModel : ViewModel() {
 
     private lateinit var db: AppDatabase
 
+    // LiveData for the RecyclerView — filtered by current chip selection
     val allGbaRoms get() = db.romEntryDao().getAllGbaRoms()
 
     private val _scanState = MutableLiveData<ScanState>(ScanState.Idle)
@@ -19,7 +20,6 @@ class HackListViewModel : ViewModel() {
     private val _openWorkflowFor = MutableLiveData<RomEntry?>(null)
     val openWorkflowFor: LiveData<RomEntry?> = _openWorkflowFor
 
-    // Current filter: null=all, "HACK"=mismatches only, "UNKNOWN_SERIAL"=unknown only
     private val _filter = MutableLiveData<String?>(null)
     val filter: LiveData<String?> = _filter
 
@@ -27,51 +27,51 @@ class HackListViewModel : ViewModel() {
         db = AppDatabase.getInstance(context)
     }
 
-    /**
-     * Run the mismatch scan against the bundled No-Intro database.
-     * Processes all GBA ROMs and updates their mismatchType in the DB.
-     */
     fun runMismatchScan(context: Context) {
         viewModelScope.launch {
             _scanState.value = ScanState.Scanning("Loading No-Intro database...")
 
-            // Pre-load the serial DB
             val serialDb = GbaSerialDatabase.load(context)
             if (serialDb.isEmpty()) {
-                _scanState.value = ScanState.Done("Failed to load No-Intro database")
+                _scanState.value = ScanState.Done("Failed to load database — check app installation")
                 return@launch
             }
 
-            val allRoms = db.romEntryDao().getAllGbaRoms().value ?: run {
-                // Force a fresh query since LiveData.value may be null
-                _scanState.value = ScanState.Done("No GBA ROMs found — scan your SD card first")
+            // Fix #3: use direct suspend query instead of LiveData.value (which is null)
+            val allRoms = db.romEntryDao().getAllGbaRomsDirect()
+
+            if (allRoms.isEmpty()) {
+                _scanState.value = ScanState.Done("No GBA ROMs found — scan your SD card from the Home tab first")
                 return@launch
             }
+
+            _scanState.value = ScanState.Scanning("Scanning ${allRoms.size} GBA ROMs...")
 
             var mismatches = 0; var unknown = 0; var matches = 0; var translations = 0
 
             allRoms.forEachIndexed { index, rom ->
-                if (index % 5 == 0) {
+                if (index % 10 == 0) {
                     _scanState.value = ScanState.Scanning(
-                        "Scanning ${index + 1}/${allRoms.size}..."
+                        "Checking ${index + 1}/${allRoms.size}: ${rom.displayName}"
                     )
                 }
 
                 val code = (rom.assignedGameCode ?: rom.originalGameCode)
                     ?.trim()?.uppercase()
 
-                if (code.isNullOrBlank() || code == "????") {
+                // No valid code — can't identify
+                if (code.isNullOrBlank() || code == "????" || code.length < 4) {
                     db.romEntryDao().setMismatchResult(rom.id, "UNKNOWN_SERIAL", null)
                     unknown++
                     return@forEachIndexed
                 }
 
-                // Check if it's a translation (T-En etc in filename)
-                val isTranslation = rom.fileName.contains(Regex("\\(T-[A-Za-z]{2,3}", RegexOption.IGNORE_CASE))
+                // Translation detection by filename
+                val isTranslation = rom.fileName.contains(
+                    Regex("\\(T-[A-Za-z]{2,3}", RegexOption.IGNORE_CASE)
+                )
 
-                val result = GbaSerialDatabase.checkMismatch(context, code, rom.fileName)
-
-                when (result) {
+                when (val result = GbaSerialDatabase.checkMismatch(context, code, rom.fileName)) {
                     is GbaSerialDatabase.MismatchResult.Match -> {
                         db.romEntryDao().setMismatchResult(rom.id, "MATCH", result.info.name)
                         matches++
@@ -90,18 +90,15 @@ class HackListViewModel : ViewModel() {
             }
 
             _scanState.value = ScanState.Done(
-                "Scan complete: $matches matched, $mismatches mismatches, " +
-                        "$translations translations, $unknown unknown serials"
+                "Scan complete — ${allRoms.size} ROMs checked\n" +
+                "$matches matched · $mismatches mismatches · " +
+                "$translations translations · $unknown unknown"
             )
         }
     }
 
     fun setFilter(filter: String?) {
         _filter.value = filter
-    }
-
-    fun openWorkflow(rom: RomEntry) {
-        _openWorkflowFor.value = rom
     }
 
     fun clearWorkflowRequest() {

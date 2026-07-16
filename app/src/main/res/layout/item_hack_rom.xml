@@ -12,76 +12,112 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:padding="12dp"
-        android:gravity="center_vertical">
+        android:orientation="vertical"
+        android:padding="12dp">
 
-        <ImageView
-            android:id="@+id/iv_art_status"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:layout_marginEnd="12dp"
-            android:contentDescription="Art status"/>
-
+        <!-- Top row: name + status chip -->
         <LinearLayout
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical">
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
 
             <TextView
                 android:id="@+id/tv_rom_name"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_weight="1"
                 android:textSize="15sp"
-                android:textStyle="bold"/>
+                android:textStyle="bold"
+                android:maxLines="1"
+                android:ellipsize="end"/>
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chip_status"
+                android:layout_width="wrap_content"
+                android:layout_height="26dp"
+                android:textSize="10sp"
+                android:text="?"
+                android:layout_marginStart="8dp"/>
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tv_file_name"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="11sp"
+            android:alpha="0.55"
+            android:layout_marginTop="2dp"/>
+
+        <!-- Header code row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="6dp">
 
             <TextView
-                android:id="@+id/tv_file_name"
+                android:text="Serial: "
+                android:textSize="12sp"
+                android:alpha="0.6"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"/>
+
+            <TextView
+                android:id="@+id/tv_game_code"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textSize="12sp"
-                android:alpha="0.6"/>
-
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginTop="4dp">
-
-                <TextView
-                    android:id="@+id/tv_game_code"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:textSize="12sp"
-                    android:background="@android:color/transparent"
-                    android:paddingEnd="8dp"/>
-
-                <TextView
-                    android:id="@+id/tv_assigned_code"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:textSize="12sp"
-                    android:textColor="@color/design_default_color_primary"
-                    android:visibility="gone"/>
-
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/chip_hack_flag"
-                    android:layout_width="wrap_content"
-                    android:layout_height="28dp"
-                    android:text="HACK"
-                    android:textSize="10sp"
-                    android:layout_marginStart="4dp"
-                    android:visibility="gone"/>
-            </LinearLayout>
+                android:fontFamily="monospace"
+                android:textStyle="bold"/>
         </LinearLayout>
 
-        <ImageView
-            android:src="@android:drawable/ic_media_next"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:alpha="0.4"
-            android:contentDescription="Open workflow"/>
+        <!-- Official name from No-Intro (shown after scan) -->
+        <LinearLayout
+            android:id="@+id/row_official_name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="2dp"
+            android:visibility="gone">
+
+            <TextView
+                android:text="DB says: "
+                android:textSize="12sp"
+                android:alpha="0.6"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"/>
+
+            <TextView
+                android:id="@+id/tv_official_name"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textSize="12sp"
+                android:textColor="#E65100"
+                android:maxLines="1"
+                android:ellipsize="end"/>
+        </LinearLayout>
+
+        <!-- Already assigned row -->
+        <TextView
+            android:id="@+id/tv_assigned_code"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="11sp"
+            android:textColor="#2E7D32"
+            android:layout_marginTop="2dp"
+            android:visibility="gone"/>
+
+        <!-- Action button -->
+        <Button
+            android:id="@+id/btn_process"
+            android:text="Fix This ROM →"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:visibility="gone"/>
 
     </LinearLayout>
 </androidx.cardview.widget.CardView>

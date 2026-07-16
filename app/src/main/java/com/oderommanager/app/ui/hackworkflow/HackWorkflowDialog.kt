@@ -18,9 +18,7 @@ class HackWorkflowDialog : BottomSheetDialogFragment() {
 
     private val imagePickerLauncher = registerForActivityResult(
         ActivityResultContracts.GetContent()
-    ) { uri ->
-        if (uri != null) viewModel.onImageSelected(requireContext(), uri)
-    }
+    ) { uri -> if (uri != null) viewModel.onImageSelected(requireContext(), uri) }
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
@@ -35,21 +33,31 @@ class HackWorkflowDialog : BottomSheetDialogFragment() {
         val romId = arguments?.getLong(ARG_ROM_ID) ?: run { dismiss(); return }
         viewModel.initialize(requireContext(), romId)
 
-        // Observe ROM data — populate header review panel (Fix #4)
         viewModel.romEntry.observe(viewLifecycleOwner) { rom ->
             if (rom == null) return@observe
             binding.tvWorkflowTitle.text = rom.displayName
             binding.tvFileName.text = rom.fileName
-            binding.tvHeaderTitle.text = if (!rom.headerGameTitle.isNullOrBlank())
-                rom.headerGameTitle else "(no title in header)"
+            binding.tvHeaderTitle.text =
+                if (!rom.headerGameTitle.isNullOrBlank()) rom.headerGameTitle
+                else "(no title in header)"
             binding.tvCurrentCode.text = rom.originalGameCode ?: "(none)"
             binding.etDisplayName.setText(rom.displayName)
+
+            // Show official No-Intro name if available
+            if (!rom.officialName.isNullOrBlank() && rom.mismatchType == "HACK") {
+                binding.labelOfficialName.visibility = View.VISIBLE
+                binding.tvOfficialName.visibility = View.VISIBLE
+                binding.tvOfficialName.text = "${rom.officialName} ← serial says this"
+            } else {
+                binding.labelOfficialName.visibility = View.GONE
+                binding.tvOfficialName.visibility = View.GONE
+            }
         }
 
-        viewModel.currentStep.observe(viewLifecycleOwner) { step -> showStep(step) }
+        viewModel.currentStep.observe(viewLifecycleOwner) { showStep(it) }
 
         viewModel.existingArtworkPath.observe(viewLifecycleOwner) { path ->
-            if (path != null) Glide.with(this).load(path).into(binding.ivExistingArt)
+            if (path != null) Glide.with(this).load(Uri.parse(path)).into(binding.ivExistingArt)
         }
 
         viewModel.generatedCode.observe(viewLifecycleOwner) { code ->
@@ -97,7 +105,6 @@ class HackWorkflowDialog : BottomSheetDialogFragment() {
             if (name.isBlank()) { binding.etDisplayName.error = "Name required"; return@setOnClickListener }
             viewModel.confirmHeaderAndName(name)
         }
-
         binding.btnArtCorrect.setOnClickListener { viewModel.confirmExistingArt() }
         binding.btnArtWrong.setOnClickListener { viewModel.rejectExistingArt() }
         binding.btnPickImage.setOnClickListener { imagePickerLauncher.launch("image/*") }

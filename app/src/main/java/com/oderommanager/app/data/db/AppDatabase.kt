@@ -20,28 +20,21 @@ class Converters {
 
 @Database(
     entities = [RomEntry::class, BackupLogEntry::class],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
-
     abstract fun romEntryDao(): RomEntryDao
     abstract fun backupLogDao(): BackupLogDao
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null
-
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
-                Room.databaseBuilder(
-                    context.applicationContext,
-                    AppDatabase::class.java,
-                    "ode_rom_manager.db"
-                )
+                Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "ode_rom_manager.db")
                     .fallbackToDestructiveMigration()
-                    .build()
-                    .also { INSTANCE = it }
+                    .build().also { INSTANCE = it }
             }
         }
     }

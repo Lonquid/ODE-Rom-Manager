@@ -16,7 +16,7 @@
             android:layout_height="wrap_content"
             android:textSize="18sp"
             android:textStyle="bold"
-            android:layout_marginBottom="4dp"/>
+            android:layout_marginBottom="12dp"/>
 
         <ProgressBar
             android:id="@+id/progress_bar"
@@ -35,7 +35,7 @@
             android:visibility="gone"
             android:layout_marginBottom="8dp"/>
 
-        <!-- ── STEP 1: Header Review (Fix #4) ── -->
+        <!-- ── STEP 1: Header Review ── -->
         <LinearLayout
             android:id="@+id/panel_review_header"
             android:layout_width="match_parent"
@@ -44,12 +44,12 @@
             android:visibility="visible">
 
             <TextView
-                android:text="Step 1: Review Header Info"
-                android:textSize="16sp"
+                android:text="Step 1: Review Header"
+                android:textSize="15sp"
                 android:textStyle="bold"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="12dp"/>
+                android:layout_marginBottom="10dp"/>
 
             <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
@@ -63,54 +63,45 @@
                     android:orientation="vertical"
                     android:padding="12dp">
 
-                    <TextView
-                        android:text="FILENAME"
-                        android:textSize="10sp"
-                        android:alpha="0.6"
-                        android:letterSpacing="0.1"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"/>
-                    <TextView
-                        android:id="@+id/tv_file_name"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:textSize="14sp"
+                    <TextView android:text="FILENAME"
+                        android:textSize="10sp" android:alpha="0.6" android:letterSpacing="0.1"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                    <TextView android:id="@+id/tv_file_name"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:textSize="13sp" android:layout_marginBottom="8dp"/>
+
+                    <TextView android:text="HEADER TITLE (raw ROM bytes)"
+                        android:textSize="10sp" android:alpha="0.6" android:letterSpacing="0.1"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                    <TextView android:id="@+id/tv_header_title"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:textSize="13sp" android:fontFamily="monospace"
                         android:layout_marginBottom="8dp"/>
 
-                    <TextView
-                        android:text="HEADER TITLE (from ROM bytes)"
-                        android:textSize="10sp"
-                        android:alpha="0.6"
-                        android:letterSpacing="0.1"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"/>
-                    <TextView
-                        android:id="@+id/tv_header_title"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:textSize="14sp"
-                        android:fontFamily="monospace"
+                    <TextView android:text="HEADER SERIAL CODE"
+                        android:textSize="10sp" android:alpha="0.6" android:letterSpacing="0.1"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                    <TextView android:id="@+id/tv_current_code"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:textSize="13sp" android:fontFamily="monospace"
                         android:layout_marginBottom="8dp"/>
 
-                    <TextView
-                        android:text="HEADER GAME CODE"
-                        android:textSize="10sp"
-                        android:alpha="0.6"
-                        android:letterSpacing="0.1"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"/>
-                    <TextView
-                        android:id="@+id/tv_current_code"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:textSize="14sp"
-                        android:fontFamily="monospace"/>
+                    <!-- Official name from No-Intro — shown if available -->
+                    <TextView android:id="@+id/label_official_name"
+                        android:text="NO-INTRO DATABASE SAYS THIS IS"
+                        android:textSize="10sp" android:alpha="0.6" android:letterSpacing="0.1"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:visibility="gone"/>
+                    <TextView android:id="@+id/tv_official_name"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:textSize="13sp" android:textColor="#E65100"
+                        android:textStyle="bold" android:visibility="gone"/>
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
 
             <TextView
-                android:text="Confirm or edit the display name for this game:"
-                android:textSize="14sp"
+                android:text="Confirm or edit the display name:"
+                android:textSize="13sp"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="8dp"/>
@@ -129,7 +120,7 @@
 
             <Button
                 android:id="@+id/btn_confirm_name"
-                android:text="Confirm Name →"
+                android:text="Next: Assign Artwork →"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"/>
         </LinearLayout>
@@ -142,48 +133,30 @@
             android:orientation="vertical"
             android:visibility="gone">
 
-            <TextView
-                android:text="Step 2: Confirm Artwork"
-                android:textSize="16sp"
-                android:textStyle="bold"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+            <TextView android:text="Step 2: Confirm Artwork"
+                android:textSize="15sp" android:textStyle="bold"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
                 android:layout_marginBottom="8dp"/>
 
-            <TextView
-                android:text="This game already has artwork assigned. Is this the correct image?"
-                android:textSize="14sp"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+            <TextView android:text="This ROM was already processed. Is the artwork still correct?"
+                android:textSize="13sp"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
                 android:layout_marginBottom="12dp"/>
 
-            <ImageView
-                android:id="@+id/iv_existing_art"
-                android:layout_width="128dp"
-                android:layout_height="120dp"
-                android:layout_gravity="center_horizontal"
-                android:scaleType="fitCenter"
-                android:layout_marginBottom="16dp"
-                android:background="@android:color/darker_gray"/>
+            <ImageView android:id="@+id/iv_existing_art"
+                android:layout_width="128dp" android:layout_height="120dp"
+                android:layout_gravity="center_horizontal" android:scaleType="fitCenter"
+                android:layout_marginBottom="16dp" android:background="@android:color/darker_gray"/>
 
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:orientation="horizontal">
-                <Button
-                    android:id="@+id/btn_art_correct"
-                    android:text="✓ Correct"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="8dp"/>
-                <Button
-                    android:id="@+id/btn_art_wrong"
+                <Button android:id="@+id/btn_art_correct" android:text="✓ Correct"
+                    android:layout_width="0dp" android:layout_height="wrap_content"
+                    android:layout_weight="1" android:layout_marginEnd="8dp"/>
+                <Button android:id="@+id/btn_art_wrong"
                     style="@style/Widget.Material3.Button.OutlinedButton"
-                    android:text="✗ Wrong image"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"/>
+                    android:text="✗ Replace" android:layout_width="0dp"
+                    android:layout_height="wrap_content" android:layout_weight="1"/>
             </LinearLayout>
         </LinearLayout>
 
@@ -195,62 +168,44 @@
             android:orientation="vertical"
             android:visibility="gone">
 
-            <TextView
-                android:text="Step 2: Choose Artwork"
-                android:textSize="16sp"
-                android:textStyle="bold"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+            <TextView android:text="Step 2: Choose Artwork"
+                android:textSize="15sp" android:textStyle="bold"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
                 android:layout_marginBottom="4dp"/>
 
-            <TextView
-                android:id="@+id/tv_new_code"
+            <TextView android:id="@+id/tv_new_code"
                 android:text="New code: generating..."
-                android:textSize="13sp"
-                android:fontFamily="monospace"
-                android:alpha="0.7"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:textSize="12sp" android:fontFamily="monospace" android:alpha="0.7"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
                 android:layout_marginBottom="8dp"/>
 
             <TextView
-                android:text="Pick an image from your phone. It will be converted to 128×120 BMP for the EZ Flash."
-                android:textSize="14sp"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:text="Pick an image — it will be resized and converted to 128×120 BMP for the EZ Flash."
+                android:textSize="13sp"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
                 android:layout_marginBottom="12dp"/>
 
-            <ImageView
-                android:id="@+id/iv_selected_art"
-                android:layout_width="128dp"
-                android:layout_height="120dp"
-                android:layout_gravity="center_horizontal"
-                android:scaleType="fitCenter"
-                android:layout_marginBottom="12dp"
-                android:background="@android:color/darker_gray"
+            <ImageView android:id="@+id/iv_selected_art"
+                android:layout_width="128dp" android:layout_height="120dp"
+                android:layout_gravity="center_horizontal" android:scaleType="fitCenter"
+                android:layout_marginBottom="12dp" android:background="@android:color/darker_gray"
                 android:src="@android:drawable/ic_menu_gallery"/>
 
-            <Button
-                android:id="@+id/btn_pick_image"
+            <Button android:id="@+id/btn_pick_image"
                 android:text="Pick Image from Phone"
                 style="@style/Widget.Material3.Button.OutlinedButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
                 android:layout_marginBottom="12dp"/>
 
             <TextView
                 android:text="⚠ Original ROM will be backed up to:\n/storage/emulated/0/ODE Rom Manager/backups/"
-                android:textSize="12sp"
-                android:alpha="0.6"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:textSize="11sp" android:alpha="0.6"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
                 android:layout_marginBottom="16dp"/>
 
-            <Button
-                android:id="@+id/btn_confirm_and_apply"
+            <Button android:id="@+id/btn_confirm_and_apply"
                 android:text="Backup &amp; Apply Changes"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:enabled="false"/>
         </LinearLayout>
 
@@ -259,23 +214,17 @@
             android:id="@+id/panel_complete"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:gravity="center"
+            android:orientation="vertical" android:gravity="center"
             android:visibility="gone">
 
-            <TextView
-                android:id="@+id/tv_success_message"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textSize="14sp"
-                android:gravity="center"
+            <TextView android:id="@+id/tv_success_message"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:textSize="14sp" android:gravity="center"
                 android:layout_marginBottom="16dp"/>
 
-            <Button
-                android:id="@+id/btn_done"
+            <Button android:id="@+id/btn_done"
                 android:text="Done"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"/>
+                android:layout_width="wrap_content" android:layout_height="wrap_content"/>
         </LinearLayout>
 
     </LinearLayout>

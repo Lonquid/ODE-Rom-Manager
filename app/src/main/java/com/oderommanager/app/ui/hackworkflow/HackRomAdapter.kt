@@ -19,36 +19,52 @@ class HackRomAdapter(
         fun bind(rom: RomEntry) {
             binding.tvRomName.text = rom.displayName
             binding.tvFileName.text = rom.fileName
-            binding.tvGameCode.text = "Code: ${rom.originalGameCode ?: "none"}"
-            binding.tvAssignedCode.text = if (rom.assignedGameCode != null) {
-                "→ Assigned: ${rom.assignedGameCode}"
-            } else ""
-            binding.tvAssignedCode.visibility =
-                if (rom.assignedGameCode != null) View.VISIBLE else View.GONE
+            binding.tvGameCode.text = rom.originalGameCode ?: "(none)"
 
-            // Status
-            binding.chipHackFlag.visibility = if (rom.isRomHack) View.VISIBLE else View.GONE
-            binding.ivArtStatus.setImageResource(
-                if (rom.hasArtwork)
-                    android.R.drawable.presence_online
-                else
-                    android.R.drawable.presence_offline
-            )
+            // Show assigned code if already processed
+            if (rom.assignedGameCode != null) {
+                binding.tvAssignedCode.text = "✓ Assigned new code: ${rom.assignedGameCode}"
+                binding.tvAssignedCode.visibility = View.VISIBLE
+                binding.btnProcess.visibility = View.GONE
+            } else {
+                binding.tvAssignedCode.visibility = View.GONE
+            }
 
+            // Show official name from No-Intro scan if available
+            if (!rom.officialName.isNullOrBlank() && rom.mismatchType != "MATCH") {
+                binding.rowOfficialName.visibility = View.VISIBLE
+                binding.tvOfficialName.text = rom.officialName
+                binding.btnProcess.visibility = View.VISIBLE
+            } else if (rom.mismatchType == "UNKNOWN_SERIAL") {
+                binding.rowOfficialName.visibility = View.VISIBLE
+                binding.tvOfficialName.text = "(not in retail database — homebrew/hack)"
+                binding.btnProcess.visibility = if (rom.assignedGameCode == null) View.VISIBLE else View.GONE
+            } else {
+                binding.rowOfficialName.visibility = View.GONE
+                binding.btnProcess.visibility = View.GONE
+            }
+
+            // Status chip
+            val (chipText, chipColor) = when (rom.mismatchType) {
+                "HACK" -> "MISMATCH" to "#E65100"
+                "UNKNOWN_SERIAL" -> "UNKNOWN" to "#6A1B9A"
+                "TRANSLATION" -> "TRANSLATION" to "#1565C0"
+                "MATCH" -> "MATCH ✓" to "#2E7D32"
+                null -> "NOT SCANNED" to "#757575"
+                else -> rom.mismatchType to "#757575"
+            }
+            binding.chipStatus.text = chipText
+
+            binding.btnProcess.setOnClickListener { onItemClick(rom) }
             binding.root.setOnClickListener { onItemClick(rom) }
         }
     }
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-        val binding = ItemHackRomBinding.inflate(
-            LayoutInflater.from(parent.context), parent, false
-        )
-        return ViewHolder(binding)
-    }
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) =
+        ViewHolder(ItemHackRomBinding.inflate(LayoutInflater.from(parent.context), parent, false))
 
-    override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+    override fun onBindViewHolder(holder: ViewHolder, position: Int) =
         holder.bind(getItem(position))
-    }
 
     companion object {
         val DIFF_CALLBACK = object : DiffUtil.ItemCallback<RomEntry>() {

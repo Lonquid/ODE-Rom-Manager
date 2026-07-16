@@ -4,53 +4,98 @@
     android:layout_height="match_parent"
     android:orientation="vertical">
 
-    <TextView
-        android:text="ROM Hack Manager"
-        android:textSize="20sp"
-        android:textStyle="bold"
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
         android:padding="16dp"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"/>
+        android:gravity="center_vertical">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:text="Mismatches"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"/>
+
+            <TextView
+                android:id="@+id/tv_subtitle"
+                android:textSize="12sp"
+                android:alpha="0.6"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Run a scan to detect mismatches"/>
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/btn_scan_mismatches"
+            android:text="Scan"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+    </LinearLayout>
+
+    <!-- Scan progress -->
+    <ProgressBar
+        android:id="@+id/progress_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        style="@style/Widget.AppCompat.ProgressBar.Horizontal"
+        android:indeterminate="true"
+        android:visibility="gone"/>
 
     <TextView
-        android:id="@+id/tv_subtitle"
-        android:textSize="13sp"
+        android:id="@+id/tv_progress"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
         android:paddingHorizontal="16dp"
         android:paddingBottom="4dp"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="GBA ROMs where header title doesn't match filename"/>
-
-    <TextView
         android:textSize="12sp"
-        android:paddingHorizontal="16dp"
-        android:paddingBottom="8dp"
-        android:alpha="0.6"
-        android:layout_width="wrap_content"
+        android:visibility="gone"/>
+
+    <!-- Filter chips: All / Mismatches / Unknown -->
+    <HorizontalScrollView
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Tap a ROM to review its header and assign artwork"/>
+        android:scrollbars="none">
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/chip_group_filter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingHorizontal="8dp"
+            android:paddingBottom="6dp"/>
+    </HorizontalScrollView>
 
     <Button
         android:id="@+id/btn_process_all"
-        android:text="Process All Unassigned"
+        android:text="Process All Flagged"
+        style="@style/Widget.Material3.Button.OutlinedButton"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginHorizontal="16dp"
-        android:layout_marginBottom="8dp"/>
+        android:layout_marginBottom="8dp"
+        android:visibility="gone"/>
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recycler_hack_roms"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"/>
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        android:paddingBottom="8dp"/>
 
     <TextView
         android:id="@+id/tv_empty"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="No header mismatches found.\nAll your GBA ROMs have matching headers and filenames."
+        android:text="Tap Scan to check your GBA ROMs against the No-Intro database.\n\nThis compares each ROM's header serial code to its filename to detect hacks and ROM hacks."
         android:gravity="center"
         android:padding="32dp"
-        android:visibility="gone"/>
+        android:visibility="visible"/>
 
 </LinearLayout>

@@ -37,8 +37,6 @@ class HackWorkflowViewModel : ViewModel() {
     fun initialize(context: Context, romId: Long) {
         repository = RomRepository(context)
         db = AppDatabase.getInstance(context)
-
-        // Fix #2: query DB directly instead of relying on LiveData.value being populated
         viewModelScope.launch {
             val rom = db.romEntryDao().getById(romId)
             romEntry.value = rom
@@ -53,12 +51,19 @@ class HackWorkflowViewModel : ViewModel() {
         viewModelScope.launch {
             _operationState.value = OpState.Loading("Checking...")
 
-            val gameCode = rom.assignedGameCode ?: rom.originalGameCode?.trim()?.uppercase()
+            // Fix #2: Only show existing art confirmation if:
+            // - ROM has art AND
+            // - It's already been assigned a custom code (previously processed)
+            // - NOT if it's still a mismatch needing header modification
+            val alreadyProcessed = rom.assignedGameCode != null
+            val hasArt = rom.hasArtwork && !rom.artworkPath.isNullOrBlank()
 
-            if (!gameCode.isNullOrBlank() && rom.hasArtwork) {
+            if (alreadyProcessed && hasArt) {
+                // Already has a custom code assigned — just confirm the art
                 _existingArtworkPath.value = rom.artworkPath
                 _currentStep.value = Step.CONFIRM_EXISTING_ART
             } else {
+                // Needs full workflow: generate new code, pick art, modify header
                 val newCode = repository.generateUniqueCode()
                 _generatedCode.value = newCode
                 _currentStep.value = Step.PICK_NEW_ART
@@ -69,7 +74,7 @@ class HackWorkflowViewModel : ViewModel() {
 
     fun confirmExistingArt() {
         _operationState.value = OpState.Success(
-            "✓ Artwork confirmed for ${romEntry.value?.displayName}\nNo changes needed."
+            "✓ Artwork confirmed for ${romEntry.value?.displayName}"
         )
     }
 
@@ -91,7 +96,7 @@ class HackWorkflowViewModel : ViewModel() {
                 tempFile.delete()
                 _operationState.value = OpState.Idle
             } else {
-                _operationState.value = OpState.Error("Could not convert image")
+                _operationState.value = OpState.Error("Could not convert image — try a different image file")
             }
         }
     }
@@ -100,7 +105,7 @@ class HackWorkflowViewModel : ViewModel() {
         val rom = romEntry.value ?: return
         val newCode = _generatedCode.value ?: return
         val bmpBytes = convertedBmpBytes ?: run {
-            _operationState.value = OpState.Error("No image converted yet")
+            _operationState.value = OpState.Error("No image selected yet")
             return
         }
         viewModelScope.launch {
@@ -110,8 +115,8 @@ class HackWorkflowViewModel : ViewModel() {
             )) {
                 is RomRepository.HackResult.Success ->
                     _operationState.value = OpState.Success(
-                        "✓ Done!\n\nNew code: $newCode\nBackup at:\n${result.backupPath}\n\n" +
-                                "Test it on your EZ Flash, then visit Backups tab to confirm or revert."
+                        "✓ Done!\n\nNew code: $newCode\nBackup saved at:\n${result.backupPath}\n\n" +
+                                "Test on your EZ Flash, then visit the Backups tab to confirm or revert."
                     )
                 is RomRepository.HackResult.Error ->
                     _operationState.value = OpState.Error(result.message)

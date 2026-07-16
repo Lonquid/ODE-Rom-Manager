@@ -19,15 +19,18 @@ interface RomEntryDao {
     @Query("SELECT * FROM rom_entries WHERE folderName = :folder ORDER BY displayName ASC")
     fun getRomsByFolder(folder: String): LiveData<List<RomEntry>>
 
-    @Query("SELECT * FROM rom_entries WHERE systemType = :systemType ORDER BY displayName ASC")
-    fun getRomsBySystem(systemType: SystemType): LiveData<List<RomEntry>>
+    // All GBA ROMs — shown in Mismatches tab, user runs scan to populate mismatchType
+    @Query("SELECT * FROM rom_entries WHERE systemType = 'GBA' ORDER BY mismatchType ASC, displayName ASC")
+    fun getAllGbaRoms(): LiveData<List<RomEntry>>
 
+    // ROMs that have been scanned and confirmed as mismatches or unknowns
     @Query("""SELECT * FROM rom_entries WHERE systemType = 'GBA'
-              AND (headerMismatch = 1 OR assignedGameCode IS NOT NULL)
+              AND mismatchType IN ('HACK','UNKNOWN_SERIAL')
+              AND assignedGameCode IS NULL
               ORDER BY displayName ASC""")
-    fun getHackCandidates(): LiveData<List<RomEntry>>
+    fun getConfirmedMismatches(): LiveData<List<RomEntry>>
 
-    @Query("SELECT * FROM rom_entries WHERE hasArtwork = 0 AND systemType = 'GBA' ORDER BY displayName ASC")
+    @Query("SELECT * FROM rom_entries WHERE hasArtwork = 0 AND systemType = 'GBA'")
     fun getGbaRomsMissingArtwork(): LiveData<List<RomEntry>>
 
     @Query("SELECT * FROM rom_entries WHERE md5Hash = :hash LIMIT 1")
@@ -51,19 +54,15 @@ interface RomEntryDao {
     @Query("UPDATE rom_entries SET artVerified = :verified, dateModified = :ts WHERE id = :id")
     suspend fun setArtVerified(id: Long, verified: Boolean, ts: Long = System.currentTimeMillis())
 
-    @Query("SELECT COUNT(*) FROM rom_entries")
-    suspend fun getTotalCount(): Int
+    @Query("UPDATE rom_entries SET mismatchType = :type, officialName = :official, dateModified = :ts WHERE id = :id")
+    suspend fun setMismatchResult(id: Long, type: String, official: String?, ts: Long = System.currentTimeMillis())
 
     @Query("SELECT COUNT(*) FROM rom_entries WHERE hasArtwork = 1")
     suspend fun getArtworkCount(): Int
-
-    @Query("SELECT COUNT(*) FROM rom_entries WHERE headerMismatch = 1")
-    suspend fun getHackCount(): Int
 }
 
 @Dao
 interface BackupLogDao {
-
     @Query("SELECT * FROM backup_log ORDER BY dateModified DESC")
     fun getAllEntries(): LiveData<List<BackupLogEntry>>
 

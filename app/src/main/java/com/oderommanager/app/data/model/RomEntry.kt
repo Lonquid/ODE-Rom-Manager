@@ -26,13 +26,15 @@ data class RomEntry(
     val isRomHack: Boolean = false,
     val headerMismatch: Boolean = false,
 
-    // Artwork
-    val artworkPath: String? = null,    // URI or path to the BMP on SD card
-    val hasArtwork: Boolean = false,
+    // Mismatch scan results (populated when user runs "Scan Mismatches")
+    // officialName = what No-Intro database says this serial code is
+    val officialName: String? = null,
+    // mismatchType: "HACK", "TRANSLATION", "UNKNOWN_SERIAL", "MATCH", null = not scanned yet
+    val mismatchType: String? = null,
 
-    // Verification state
-    // artVerified = true: user confirmed art is correct, no question mark
-    // artVerified = false + hasArtwork = true: show thumbnail with "?" overlay
+    // Artwork
+    val artworkPath: String? = null,
+    val hasArtwork: Boolean = false,
     val artVerified: Boolean = false,
 
     val scraperGameId: Long? = null,

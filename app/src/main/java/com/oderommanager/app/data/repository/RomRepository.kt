@@ -187,12 +187,12 @@ class RomRepository(private val context: Context) {
         romDao.update(romEntry.copy(
             hasArtwork = true,
             artworkPath = artUri.toString(),
-            artVerified = true,  // scraper-downloaded art is auto-verified
-            scraperGameId = gameInfo.gameId,
-            scraperMatchMethod = gameInfo.matchMethod,
+            artVerified = true,
+            scraperGameId = gameInfo?.gameId,
+            scraperMatchMethod = gameInfo?.matchMethod,
             dateModified = System.currentTimeMillis()
         ))
-        ArtworkResult.Success(gameInfo.gameName, gameInfo.matchMethod)
+        ArtworkResult.Success(gameInfo?.gameName ?: romEntry.displayName, gameInfo?.matchMethod ?: "fallback")
     }
 
     // ── Renaming ──────────────────────────────────────────────────────────────

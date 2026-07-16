@@ -4,6 +4,7 @@
     android:layout_height="match_parent"
     android:orientation="vertical">
 
+    <!-- Header row -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -30,7 +31,7 @@
                 android:alpha="0.6"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Run a scan to detect mismatches"/>
+                android:text="Tap Scan to check ROMs against No-Intro database"/>
         </LinearLayout>
 
         <Button
@@ -58,7 +59,7 @@
         android:textSize="12sp"
         android:visibility="gone"/>
 
-    <!-- Filter chips: All / Mismatches / Unknown -->
+    <!-- Filter chips -->
     <HorizontalScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -71,11 +72,11 @@
             android:paddingBottom="6dp"/>
     </HorizontalScrollView>
 
+    <!-- Process All button — only shown when there are unprocessed mismatches -->
     <Button
         android:id="@+id/btn_process_all"
-        android:text="Process All Flagged"
-        style="@style/Widget.Material3.Button.OutlinedButton"
-        android:layout_width="wrap_content"
+        android:text="Process All Flagged (0)"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginHorizontal="16dp"
         android:layout_marginBottom="8dp"
@@ -93,7 +94,7 @@
         android:id="@+id/tv_empty"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Tap Scan to check your GBA ROMs against the No-Intro database.\n\nThis compares each ROM's header serial code to its filename to detect hacks and ROM hacks."
+        android:text="Tap Scan to check your GBA ROMs against the No-Intro database.\n\nThis detects hacks, translations, and ROMs with mismatched headers."
         android:gravity="center"
         android:padding="32dp"
         android:visibility="visible"/>

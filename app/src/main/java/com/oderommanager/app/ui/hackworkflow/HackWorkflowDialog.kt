@@ -13,6 +13,11 @@ import com.oderommanager.app.databinding.DialogHackWorkflowBinding
 class HackWorkflowDialog : BottomSheetDialogFragment() {
 
     private var _binding: DialogHackWorkflowBinding? = null
+    private var dismissCallback: (() -> Unit)? = null
+
+    fun setOnDismissCallback(callback: () -> Unit) {
+        dismissCallback = callback
+    }
     private val binding get() = _binding!!
     private val viewModel: HackWorkflowViewModel by viewModels()
 
@@ -143,6 +148,7 @@ class HackWorkflowDialog : BottomSheetDialogFragment() {
     override fun onDestroyView() {
         super.onDestroyView()
         _binding = null
+        dismissCallback?.invoke()
     }
 
     companion object {

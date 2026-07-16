@@ -19,7 +19,7 @@ interface RomEntryDao {
     @Query("SELECT * FROM rom_entries WHERE folderName = :folder ORDER BY displayName ASC")
     fun getRomsByFolder(folder: String): LiveData<List<RomEntry>>
 
-    @Query("SELECT * FROM rom_entries WHERE systemType = 'GBA' ORDER BY mismatchType ASC, displayName ASC")
+    @Query("SELECT * FROM rom_entries WHERE systemType = 'GBA' ORDER BY displayName ASC COLLATE NOCASE")
     fun getAllGbaRoms(): LiveData<List<RomEntry>>
 
     // Direct suspend query for use in coroutines — avoids LiveData.value being null

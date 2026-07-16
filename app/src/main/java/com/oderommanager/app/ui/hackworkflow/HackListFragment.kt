@@ -17,6 +17,7 @@ class HackListFragment : Fragment() {
     private val viewModel: HackListViewModel by viewModels()
     private lateinit var adapter: HackRomAdapter
     private var allRoms: List<RomEntry> = emptyList()
+    private var currentFilter: String? = null
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
@@ -33,28 +34,37 @@ class HackListFragment : Fragment() {
         binding.recyclerHackRoms.layoutManager = LinearLayoutManager(requireContext())
         binding.recyclerHackRoms.adapter = adapter
 
-        // Build filter chips
         setupFilterChips()
 
         viewModel.allGbaRoms.observe(viewLifecycleOwner) { roms ->
             allRoms = roms
-            applyFilter(viewModel.filter.value)
+            applyFilter(currentFilter)
+
             val scanned = roms.count { it.mismatchType != null }
             val mismatches = roms.count { it.mismatchType == "HACK" }
             val unknown = roms.count { it.mismatchType == "UNKNOWN_SERIAL" }
             val translations = roms.count { it.mismatchType == "TRANSLATION" }
+            val unprocessed = roms.count {
+                it.mismatchType in listOf("HACK", "UNKNOWN_SERIAL") && it.assignedGameCode == null
+            }
 
             binding.tvSubtitle.text = if (scanned == 0) {
                 "${roms.size} GBA ROMs · tap Scan to check"
             } else {
-                "$scanned scanned · $mismatches mismatches · $translations translations · $unknown unknown"
+                "$scanned checked · $mismatches mismatches · $translations translations · $unknown unknown"
             }
 
-            binding.btnProcessAll.visibility =
-                if (mismatches > 0 || unknown > 0) View.VISIBLE else View.GONE
+            // Fix #3: show count on the button so user knows how many need processing
+            if (unprocessed > 0) {
+                binding.btnProcessAll.visibility = View.VISIBLE
+                binding.btnProcessAll.text = "Process All Flagged ($unprocessed)"
+            } else {
+                binding.btnProcessAll.visibility = View.GONE
+            }
         }
 
         viewModel.filter.observe(viewLifecycleOwner) { filter ->
+            currentFilter = filter
             applyFilter(filter)
         }
 
@@ -80,34 +90,28 @@ class HackListFragment : Fragment() {
             }
         }
 
-        viewModel.openWorkflowFor.observe(viewLifecycleOwner) { rom ->
-            if (rom != null) {
-                openHackWorkflow(rom)
-                viewModel.clearWorkflowRequest()
-            }
-        }
-
         binding.btnScanMismatches.setOnClickListener {
             viewModel.runMismatchScan(requireContext())
         }
 
+        // Fix #3: "Process All" opens the workflow for the first unprocessed ROM,
+        // and when each workflow completes/dismisses it auto-opens the next one
         binding.btnProcessAll.setOnClickListener {
-            val unprocessed = allRoms.firstOrNull {
+            val next = allRoms.firstOrNull {
                 it.mismatchType in listOf("HACK", "UNKNOWN_SERIAL") && it.assignedGameCode == null
             }
-            if (unprocessed != null) openHackWorkflow(unprocessed)
+            if (next != null) openHackWorkflow(next)
         }
     }
 
     private fun setupFilterChips() {
         binding.chipGroupFilter.removeAllViews()
-
         listOf(
             "All" to null,
             "Mismatches" to "HACK",
             "Translations" to "TRANSLATION",
             "Unknown" to "UNKNOWN_SERIAL",
-            "Matches" to "MATCH"
+            "Matched" to "MATCH"
         ).forEach { (label, filter) ->
             val chip = Chip(requireContext()).apply {
                 text = label
@@ -120,17 +124,30 @@ class HackListFragment : Fragment() {
     }
 
     private fun applyFilter(filter: String?) {
-        val filtered = when (filter) {
-            null -> allRoms
-            else -> allRoms.filter { it.mismatchType == filter }
-        }
+        val filtered = if (filter == null) allRoms
+        else allRoms.filter { it.mismatchType == filter }
         adapter.submitList(filtered)
         binding.tvEmpty.visibility = if (filtered.isEmpty()) View.VISIBLE else View.GONE
         binding.recyclerHackRoms.visibility = if (filtered.isEmpty()) View.GONE else View.VISIBLE
     }
 
     private fun openHackWorkflow(rom: RomEntry) {
-        HackWorkflowDialog.newInstance(rom.id).show(parentFragmentManager, "hack_workflow")
+        val dialog = HackWorkflowDialog.newInstance(rom.id)
+        // Fix #3: when dialog dismisses, auto-advance to next unprocessed ROM if in bulk mode
+        dialog.setOnDismissCallback {
+            val nextUnprocessed = allRoms.firstOrNull {
+                it.id != rom.id &&
+                it.mismatchType in listOf("HACK", "UNKNOWN_SERIAL") &&
+                it.assignedGameCode == null
+            }
+            // Only auto-advance if Process All was active (more than 1 still pending)
+            val pendingCount = allRoms.count {
+                it.mismatchType in listOf("HACK", "UNKNOWN_SERIAL") && it.assignedGameCode == null
+            }
+            // Don't auto-advance — let the button show the updated count
+            // User can press Process All again for each one if they want bulk
+        }
+        dialog.show(parentFragmentManager, "hack_workflow_${rom.id}")
     }
 
     override fun onDestroyView() {

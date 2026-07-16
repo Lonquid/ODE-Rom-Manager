@@ -47,12 +47,15 @@ class LibraryFragment : Fragment() {
             // Fix #1: resolve the actual BMP URI from the SD card using the game code
             getArtUri = { rom ->
                 val code = (rom.assignedGameCode ?: rom.originalGameCode)
-                    ?.trim()?.uppercase() ?: return@RomLibraryAdapter null
-                artUriCache.getOrPut(code) {
-                    if (sdUri != null) {
-                        SdCardScanner.getArtworkUri(requireContext(), sdUri, imgsPath, code)
-                            ?: return@RomLibraryAdapter null
-                    } else return@RomLibraryAdapter null
+                    ?.trim()?.uppercase()
+                if (code.isNullOrBlank() || sdUri == null) {
+                    null
+                } else {
+                    artUriCache.getOrElse(code) {
+                        val uri = SdCardScanner.getArtworkUri(requireContext(), sdUri, imgsPath, code)
+                        if (uri != null) artUriCache[code] = uri
+                        uri
+                    }
                 }
             }
         )

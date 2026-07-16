@@ -7,6 +7,7 @@ import androidx.lifecycle.LiveData
 import com.oderommanager.app.data.db.AppDatabase
 import com.oderommanager.app.data.model.*
 import com.oderommanager.app.util.*
+import com.oderommanager.app.util.TheGamesDbApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -141,14 +142,27 @@ class RomRepository(private val context: Context) {
         val sdUri = settingsRepo.getSdCardUri()
             ?: return@withContext ArtworkResult.Error("No SD card configured")
 
+        // Try ScreenScraper first (most accurate — matches by hash)
         val gameInfo = api.scrapeByHash(
             romEntry.md5Hash, romEntry.fileSizeBytes,
             region = settings.artworkRegion.ssRegionCode
         ) ?: api.scrapeByFilename(
             romEntry.fileName, region = settings.artworkRegion.ssRegionCode
-        ) ?: return@withContext ArtworkResult.NotFound
+        )
 
-        val artUrl = gameInfo.boxArtUrl ?: return@withContext ArtworkResult.NoArtAvailable
+        val artUrl: String?
+        if (gameInfo?.boxArtUrl != null) {
+            artUrl = gameInfo.boxArtUrl
+        } else {
+            // Fallback to TheGamesDB (free, no login required)
+            val tgdbResult = TheGamesDbApi.searchByName(romEntry.displayName)
+            artUrl = tgdbResult?.boxArtUrl
+        }
+
+        if (artUrl == null) {
+            return@withContext if (gameInfo != null) ArtworkResult.NoArtAvailable
+            else ArtworkResult.NotFound
+        }
 
         val tempFile = File(context.cacheDir, "temp_art_${System.currentTimeMillis()}.jpg")
         if (!api.downloadImage(artUrl, tempFile))

@@ -92,7 +92,7 @@ object BmpConverter {
         // BITMAPINFOHEADER (40 bytes)
         le4(40)                 // DIB header size
         le4(TARGET_WIDTH)       // width = 120
-        le4(TARGET_HEIGHT)      // height = 80 (positive = bottom-up storage)
+        le4(-TARGET_HEIGHT)     // height = -80 (negative = top-down storage, EZ Flash reads top-down)
         le2(1)                  // color planes = 1
         le2(16)                 // bits per pixel = 16
         le4(0)                  // compression = BI_RGB (no compression)
@@ -111,8 +111,8 @@ object BmpConverter {
         bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
         val rowBuffer = ByteArray(ROW_SIZE)
 
-        // BMP rows are stored bottom-up (last image row first in file)
-        for (row in height - 1 downTo 0) {
+        // EZ Flash kernel reads rows top-down directly into VRAM — write top-down
+        for (row in 0 until height) {
             var idx = 0
             for (col in 0 until width) {
                 val pixel = pixels[row * width + col]

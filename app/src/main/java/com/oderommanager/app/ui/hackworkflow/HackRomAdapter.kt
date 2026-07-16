@@ -46,11 +46,11 @@ class HackRomAdapter(
 
             // Status chip
             val (chipText, chipColor) = when (rom.mismatchType) {
-                "HACK" -> "MISMATCH" to "#E65100"
-                "UNKNOWN_SERIAL" -> "UNKNOWN" to "#6A1B9A"
-                "TRANSLATION" -> "TRANSLATION" to "#1565C0"
-                "MATCH" -> "MATCH ✓" to "#2E7D32"
-                null -> "NOT SCANNED" to "#757575"
+                "HACK" -> "⚠ Mismatch" to "#E65100"
+                "UNKNOWN_SERIAL" -> "? Unknown" to "#6A1B9A"
+                "TRANSLATION" -> "T Translation" to "#1565C0"
+                "MATCH" -> "✓ Match" to "#2E7D32"
+                null -> "— Not scanned" to "#757575"
                 else -> rom.mismatchType to "#757575"
             }
             binding.chipStatus.text = chipText

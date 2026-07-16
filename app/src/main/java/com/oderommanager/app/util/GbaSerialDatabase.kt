@@ -75,13 +75,17 @@ object GbaSerialDatabase {
 
         // Significant word overlap check — split into meaningful words,
         // require >50% of the official name's words to appear in the filename
+        // Split into meaningful words (3+ chars, skip common articles)
+        val skipWords = setOf("the", "and", "for", "gba", "nds", "ver", "version")
         val officialWords = officialName
-            .split(Regex("\\s+|-"))
-            .filter { it.length > 2 }  // skip short words like "a", "of", "the"
+            .split(Regex("[\\s\\-&'!]+"))
+            .map { it.lowercase().filter { c -> c.isLetterOrDigit() } }
+            .filter { it.length >= 3 && it !in skipWords }
             .toSet()
         val fileWords = cleanFile
-            .split(Regex("\\s+|-"))
-            .filter { it.length > 2 }
+            .split(Regex("[\\s\\-&'!]+"))
+            .map { it.lowercase().filter { c -> c.isLetterOrDigit() } }
+            .filter { it.length >= 3 && it !in skipWords }
             .toSet()
 
         if (officialWords.isEmpty()) return MismatchResult.Match(info)
@@ -89,7 +93,7 @@ object GbaSerialDatabase {
         val overlap = officialWords.intersect(fileWords).size.toFloat()
         val ratio = overlap / officialWords.size
 
-        return if (ratio >= 0.6f) {
+        return if (ratio >= 0.9f) {
             // Enough words match — likely same game (e.g. regional variant)
             MismatchResult.Match(info)
         } else {

@@ -22,7 +22,7 @@ class RomRepository(private val context: Context) {
     val allFolderNames = romDao.getAllFolderNames()
     val allBackupLogs = backupDao.getAllEntries()
     val pendingBackupCount = backupDao.getPendingCount()
-    val hackCandidates = romDao.getHackCandidates()
+    val allGbaRoms = romDao.getAllGbaRoms()
 
     fun getRomsByFolder(folder: String): LiveData<List<RomEntry>> =
         romDao.getRomsByFolder(folder)

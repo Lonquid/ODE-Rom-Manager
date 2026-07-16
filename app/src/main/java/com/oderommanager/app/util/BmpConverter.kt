@@ -40,15 +40,45 @@ object BmpConverter {
 
     fun convertToBmp(context: Context, sourceUri: Uri, outputFile: File): Boolean {
         return try {
-            val sourceBitmap = context.contentResolver.openInputStream(sourceUri)?.use {
-                BitmapFactory.decodeStream(it)
-            } ?: return false
+            // Decode with EXIF orientation correction
+            val sourceBitmap = decodeWithOrientation(context, sourceUri) ?: return false
             val result = convertToBmp(sourceBitmap, outputFile)
             sourceBitmap.recycle()
             result
         } catch (e: Exception) {
             false
         }
+    }
+
+    private fun decodeWithOrientation(context: Context, uri: Uri): android.graphics.Bitmap? {
+        val bitmap = context.contentResolver.openInputStream(uri)?.use {
+            android.graphics.BitmapFactory.decodeStream(it)
+        } ?: return null
+
+        // Read EXIF orientation to correct any rotation/flip from camera or download
+        val exif = try {
+            context.contentResolver.openInputStream(uri)?.use {
+                androidx.exifinterface.media.ExifInterface(it)
+            }
+        } catch (e: Exception) { null }
+
+        val orientation = exif?.getAttributeInt(
+            androidx.exifinterface.media.ExifInterface.TAG_ORIENTATION,
+            androidx.exifinterface.media.ExifInterface.ORIENTATION_NORMAL
+        ) ?: androidx.exifinterface.media.ExifInterface.ORIENTATION_NORMAL
+
+        val matrix = android.graphics.Matrix()
+        when (orientation) {
+            androidx.exifinterface.media.ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
+            androidx.exifinterface.media.ExifInterface.ORIENTATION_ROTATE_180 -> matrix.postRotate(180f)
+            androidx.exifinterface.media.ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270f)
+            androidx.exifinterface.media.ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> matrix.postScale(-1f, 1f)
+            androidx.exifinterface.media.ExifInterface.ORIENTATION_FLIP_VERTICAL -> matrix.postScale(1f, -1f)
+            else -> return bitmap // no transform needed
+        }
+
+        return android.graphics.Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+            .also { if (it != bitmap) bitmap.recycle() }
     }
 
     fun convertToBmp(sourceBitmap: Bitmap, outputFile: File): Boolean {
@@ -92,7 +122,7 @@ object BmpConverter {
         // BITMAPINFOHEADER (40 bytes)
         le4(40)                 // DIB header size
         le4(TARGET_WIDTH)       // width = 120
-        le4(-TARGET_HEIGHT)     // height = -80 (negative = top-down storage, EZ Flash reads top-down)
+        le4(TARGET_HEIGHT)      // height = 80
         le2(1)                  // color planes = 1
         le2(16)                 // bits per pixel = 16
         le4(0)                  // compression = BI_RGB (no compression)
@@ -111,7 +141,7 @@ object BmpConverter {
         bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
         val rowBuffer = ByteArray(ROW_SIZE)
 
-        // EZ Flash kernel reads rows top-down directly into VRAM — write top-down
+        // EZ Flash reads pixel data top-down into VRAM
         for (row in 0 until height) {
             var idx = 0
             for (col in 0 until width) {
